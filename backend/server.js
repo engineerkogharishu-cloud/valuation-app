@@ -50,13 +50,11 @@ const allowedOrigins = (process.env.CORS_ORIGIN || "")
   .filter(Boolean);
 
 if (!allowedOrigins.length) {
-  if (process.env.NODE_ENV === "production") {
-    // On Netlify, frontend and functions share the same origin — CORS_ORIGIN
-    // should be set to the Netlify site URL (e.g. https://yoursite.netlify.app).
-    console.warn("WARNING: CORS_ORIGIN not set in production. Allowing same-origin requests only.");
-  }
   allowedOrigins.push("http://localhost:3000");
 }
+
+// Allow any *.netlify.app subdomain as a safe fallback for production
+const NETLIFY_PATTERN = /^https:\/\/[a-z0-9-]+\.netlify\.app$/;
 
 // ── App bootstrap ────────────────────────────────────────────────────────────
 const app = express();
@@ -105,7 +103,7 @@ app.use(cors({
     if (process.env.NODE_ENV === "production" && !origin) {
       return cb(new Error("CORS: missing Origin header"));
     }
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    if (!origin || allowedOrigins.includes(origin) || NETLIFY_PATTERN.test(origin)) return cb(null, true);
     cb(new Error("CORS policy violation"));
   },
   credentials:     true,
