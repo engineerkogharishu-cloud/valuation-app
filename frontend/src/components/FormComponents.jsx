@@ -1,6 +1,7 @@
 import React from "react";
 import { adToBs } from "../utils/bsDate";
 import NepaliDatePicker from "./NepaliDatePicker";
+import { SALUTATIONS } from "../constants";
 
 export function Field({ label, required, children }) {
   return (
@@ -25,7 +26,19 @@ export function PersonForm({ data, onChange }) {
   const todayBs = adToBs(new Date());
   return (
     <div className="sub-grid">
-      <Field label="Full Name" required><input value={data.name} onChange={e=>f("name")(e.target.value)} placeholder="Full name"/></Field>
+      <Field label="Full Name" required>
+        <div style={{display:"flex",gap:"6px"}}>
+          <select
+            value={data.salutation||""}
+            onChange={e=>f("salutation")(e.target.value)}
+            style={{width:"90px",flexShrink:0}}
+          >
+            <option value="">—</option>
+            {SALUTATIONS.map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+          <input style={{flex:1}} value={data.name} onChange={e=>f("name")(e.target.value)} placeholder="Full name"/>
+        </div>
+      </Field>
       <Field label="Citizenship No." required><input value={data.citizenshipNo} onChange={e=>f("citizenshipNo")(e.target.value)} placeholder="xxx-xx-xxxxx"/></Field>
       <Field label="Issued Date (BS)">
         <NepaliDatePicker value={data.issuedDate} onChange={f("issuedDate")} maxBs={todayBs} />

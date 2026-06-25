@@ -10,6 +10,8 @@ export const BANKS = [
   "Janata Bank Nepal","Mega Bank","Shangrila Development Bank","Other"
 ];
 
+export const SALUTATIONS = ["Mr.", "Mrs.", "Ms.", "Dr.", "Prof.", "Er.", "Adv.", "CA", "Arch."];
+
 export const LAND_TYPES = ["Agricultural","Residential","Commercial","Industrial","Forest","River/Water","Road","Other"];
 export const LAND_CATEGORIES = ["Aabal","Doyam","Sim","Chahar","Pancham"];
 export const OWNERSHIP_TYPES = ["Single","Private","Joint","Government","Guthi","Guthi Raitani","Other"];
@@ -18,12 +20,12 @@ export const OWNERSHIP_TYPES = ["Single","Private","Joint","Government","Guthi",
 export const uid = () => Math.random().toString(36).slice(2, 8);
 
 export const emptyDirector = () => ({
-  id: uid(), name:"", citizenshipNo:"", issuedDate:"", issuedBy:"",
+  id: uid(), salutation:"", name:"", citizenshipNo:"", issuedDate:"", issuedBy:"",
   address:"", contact:"", fatherName:"", husbandName:"", grandfatherName:""
 });
 
 export const emptyPerson = () => ({
-  name:"", citizenshipNo:"", issuedDate:"", issuedBy:"",
+  salutation:"", name:"", citizenshipNo:"", issuedDate:"", issuedBy:"",
   address:"", contact:"", fatherName:"", husbandName:"", grandfatherName:""
 });
 
@@ -38,7 +40,7 @@ export const emptyClient = () => ({
 export const emptyProperty = () => ({
   id: uid(), plotNo:"", traceSheetNo:"", landType:"", addressLalpurja:"", presentAddress:"",
   category:"", areaUnit:"radp", areaSqm:"", areaRadp:{r:"",a:"",p:"",d:""}, areaBkd:{b:"",k:"",d:""},
-  ownershipType:"", ownerName:"", tenantInfo:"",
+  ownershipType:"", ownerSalutation:"", ownerName:"", tenantInfo:"",
   location:"", googlePlusCode:"", lat:"", lng:"",
   _mapEnabled: false
 });

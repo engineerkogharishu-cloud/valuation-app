@@ -43,8 +43,10 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
   const nativeHdr = allBkdMort ? "B-K-D" : anyBkdMort ? "R-A-P-D / B-K-D" : "R-A-P-D";
   const unitHdr = allBkdMort ? "Dhur" : anyBkdMort ? "Aana / Dhur" : "Aana";
 
+  const fullName = (person) => [person?.salutation, person?.name].filter(Boolean).join(" ");
+
   const personRows = (person) => `
-    <tr><td>Name</td><td>${esc(person.name)}</td><td>Citizenship No.</td><td>${esc(person.citizenshipNo)}</td></tr>
+    <tr><td>Name</td><td>${esc(fullName(person))}</td><td>Citizenship No.</td><td>${esc(person.citizenshipNo)}</td></tr>
     <tr><td>Issued Date (BS)</td><td>${esc(person.issuedDate)}</td><td>Issued By</td><td>${esc(person.issuedBy)}</td></tr>
     <tr><td>Father's Name</td><td>${esc(person.fatherName)}</td><td>Grandfather's Name</td><td>${esc(person.grandfatherName)}</td></tr>
     <tr><td>Husband's Name</td><td>${esc(person.husbandName)}</td><td>Contact</td><td>${esc(person.contact)}</td></tr>
@@ -64,7 +66,7 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
         <tr><td>Contact</td><td>${esc(cl.company?.contact)}</td><td>Address</td><td>${esc(cl.company?.address)}</td></tr>
       </table>`;
       (cl.company?.directors || []).forEach((d, di) => {
-        html += `<div style="margin:5pt 0 2pt;font-style:italic;font-size:10.5pt">Director ${di + 1}${d.name ? ": " + esc(d.name) : ""}</div><table class="info-table">${personRows(d)}</table>`;
+        html += `<div style="margin:5pt 0 2pt;font-style:italic;font-size:10.5pt">Director ${di + 1}${d.name ? ": " + esc(fullName(d)) : ""}</div><table class="info-table">${personRows(d)}</table>`;
       });
     }
     return html;
@@ -82,7 +84,7 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
         <tr><td>Contact</td><td>${esc(ow.company?.contact)}</td><td>Address</td><td>${esc(ow.company?.address)}</td></tr>
       </table>`;
       (ow.company?.directors || []).forEach((d, di) => {
-        html += `<div style="margin:5pt 0 2pt;font-style:italic;font-size:10.5pt">Director ${di + 1}${d.name ? ": " + esc(d.name) : ""}</div><table class="info-table">${personRows(d)}</table>`;
+        html += `<div style="margin:5pt 0 2pt;font-style:italic;font-size:10.5pt">Director ${di + 1}${d.name ? ": " + esc(fullName(d)) : ""}</div><table class="info-table">${personRows(d)}</table>`;
       });
     }
     return html;
@@ -95,7 +97,7 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
     return `<tr>
       <td>${esc(p.plotNo)}</td><td>${esc(p.traceSheetNo)}</td><td>${esc(p.landType)}</td>
       <td>${sqm.toFixed(3)}</td><td>${_nativeStr(p, sqm)}</td>
-      <td>${esc(p.ownerName)}</td><td>${esc(p.addressLalpurja)}</td><td>${esc(p.presentAddress)}</td>
+      <td>${esc([p.ownerSalutation,p.ownerName].filter(Boolean).join(' '))}</td><td>${esc(p.addressLalpurja)}</td><td>${esc(p.presentAddress)}</td>
     </tr>`;
   }).join("");
 
@@ -105,7 +107,7 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
     const measured = parseFloat(s.areaMeasured?.[p.id]) || lSqm;
     const radp = sqmToRadp(lSqm);
     return `<tr>
-      <td>${esc(p.plotNo)}</td><td>${esc(p.traceSheetNo)}</td><td>${esc(p.ownerName)}</td>
+      <td>${esc(p.plotNo)}</td><td>${esc(p.traceSheetNo)}</td><td>${esc([p.ownerSalutation,p.ownerName].filter(Boolean).join(' '))}</td>
       <td>${areaDisplay(p)}</td>
       <td>${lSqm.toFixed(3)}</td><td>${measured.toFixed(3)}</td>
     </tr>`;

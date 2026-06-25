@@ -93,8 +93,12 @@
 
     // ── Data defaults ─────────────────────────────────────────────────
     const todayISO = () => new Date().toISOString().slice(0,10);
+    const SALUTATIONS = ["Mr.", "Mrs.", "Ms.", "Dr.", "Prof.", "Er.", "Adv.", "CA", "Arch."];
+
     const EMPTY_FORM = {
-      submitterName:"", clientName:"", ownerName:"", location:"",
+      submitterSalutation:"", submitterName:"",
+      clientSalutation:"", clientName:"",
+      ownerSalutation:"", ownerName:"", location:"",
       bank:"", branch:"", visitDate:todayISO(), notes:"",
       lat:"", lng:"", googlePlusCode:"",
       landMarketRate:"", buildingRate:"",
@@ -454,15 +458,33 @@
           <form onSubmit={handleSubmit} style={S.card}>
 
             <F label="Your Name (Collector)">
-              <input style={S.input} value={form.submitterName} onChange={set("submitterName")} placeholder="Enter your name" autoComplete="name" />
+              <div style={{display:"flex",gap:6}}>
+                <select style={{...S.select,width:90,flexShrink:0}} value={form.submitterSalutation} onChange={set("submitterSalutation")}>
+                  <option value="">—</option>
+                  {SALUTATIONS.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+                <input style={{...S.input,flex:1}} value={form.submitterName} onChange={set("submitterName")} placeholder="Enter your name" autoComplete="name" />
+              </div>
             </F>
 
             <F label="Client / Borrower Name *">
-              <input style={S.input} value={form.clientName} onChange={set("clientName")} placeholder="Full name of client" autoComplete="off" />
+              <div style={{display:"flex",gap:6}}>
+                <select style={{...S.select,width:90,flexShrink:0}} value={form.clientSalutation} onChange={set("clientSalutation")}>
+                  <option value="">—</option>
+                  {SALUTATIONS.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+                <input style={{...S.input,flex:1}} value={form.clientName} onChange={set("clientName")} placeholder="Full name of client" autoComplete="off" />
+              </div>
             </F>
 
             <F label="Owner Name">
-              <input style={S.input} value={form.ownerName} onChange={set("ownerName")} placeholder="Property owner name (if different from client)" autoComplete="off" />
+              <div style={{display:"flex",gap:6}}>
+                <select style={{...S.select,width:90,flexShrink:0}} value={form.ownerSalutation} onChange={set("ownerSalutation")}>
+                  <option value="">—</option>
+                  {SALUTATIONS.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+                <input style={{...S.input,flex:1}} value={form.ownerName} onChange={set("ownerName")} placeholder="Property owner name (if different from client)" autoComplete="off" />
+              </div>
             </F>
 
             <F label="Bank">

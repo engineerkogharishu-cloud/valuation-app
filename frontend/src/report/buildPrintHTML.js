@@ -66,9 +66,11 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
   const T = buildTheme(s.reportColorTheme);
   const rType = (s.reportType||"preliminary").toUpperCase();
 
+  const fullName = (person) => [person?.salutation, person?.name].filter(Boolean).join(" ");
+
   const clientLine = (s.clients||[]).map(cl=>{
     const parts=[];
-    if(cl.showPerson&&cl.person?.name) parts.push(cl.person.name);
+    if(cl.showPerson&&cl.person?.name) parts.push(fullName(cl.person));
     if(cl.showCompany&&cl.company?.name) parts.push(cl.company.name);
     return parts.join(" / ");
   }).filter(Boolean).join(", ")||"—";
@@ -80,7 +82,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
   const unitHdr = allBkdMort ? "Dhur" : anyBkdMort ? "Aana / Dhur" : "Aana";
 
   const personRows = (person) => `
-    <tr><td>Name</td><td>${esc(person.name)}</td><td>Citizenship No.</td><td>${esc(person.citizenshipNo)}</td></tr>
+    <tr><td>Name</td><td>${esc(fullName(person))}</td><td>Citizenship No.</td><td>${esc(person.citizenshipNo)}</td></tr>
     <tr><td>Issued Date (BS)</td><td>${esc(person.issuedDate)}</td><td>Issued By</td><td>${esc(person.issuedBy)}</td></tr>
     <tr><td>Father's Name</td><td>${esc(person.fatherName)}</td><td>Grandfather's Name</td><td>${esc(person.grandfatherName)}</td></tr>
     <tr><td>Husband's Name</td><td>${esc(person.husbandName)}</td><td>Contact</td><td>${esc(person.contact)}</td></tr>
@@ -901,7 +903,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
           ${(s.clients||[]).map(cl=>{
             const rows=[];
             if(cl.showPerson&&cl.person?.name){
-              rows.push(`<div style="font-weight:bold;font-size:12pt;color:${T.primary};line-height:1.25">${esc(cl.person.name)}</div>`);
+              rows.push(`<div style="font-weight:bold;font-size:12pt;color:${T.primary};line-height:1.25">${esc(fullName(cl.person))}</div>`);
               if(cl.person.contact) rows.push(`<div style="font-size:9.5pt;color:#666">Tel. ${esc(cl.person.contact)}</div>`);
             }
             if(cl.showCompany&&cl.company?.name){
@@ -914,7 +916,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
           <div style="font-size:8pt;font-weight:bold;text-transform:uppercase;letter-spacing:1.5px;color:${T.medium};margin-bottom:2pt">Owners and Location of Property</div>
           ${(s.owners||[]).map(ow=>{
             const rows=[];
-            if(ow.showPerson&&ow.person?.name) rows.push(`<div style="font-weight:bold;font-size:12pt;color:${T.primary};line-height:1.25">${esc(ow.person.name)}</div>`);
+            if(ow.showPerson&&ow.person?.name) rows.push(`<div style="font-weight:bold;font-size:12pt;color:${T.primary};line-height:1.25">${esc(fullName(ow.person))}</div>`);
             if(ow.showCompany&&ow.company?.name) rows.push(`<div style="font-weight:bold;font-size:12pt;color:${T.primary};line-height:1.25">${esc(ow.company.name)}</div>`);
             return rows.join("");
           }).join('<div style="border-top:0.5pt dashed #ddd;margin:2pt 0"></div>')||`<div style="color:#aaa;font-style:italic">—</div>`}
@@ -1020,7 +1022,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
         let r=`<table style="width:100%;border-collapse:collapse;margin-bottom:3pt;font-size:9.5pt">`;
         if(!multiCl){
           const cl=cl0[0]||{};
-          const nm=esc(cl.showPerson&&cl.person?.name?cl.person.name:cl.showCompany&&cl.company?.name?cl.company.name:'—');
+          const nm=esc(cl.showPerson&&cl.person?.name?fullName(cl.person):cl.showCompany&&cl.company?.name?cl.company.name:'—');
           const addr=esc(cl.person?.address||cl.company?.address||pr0[0]?.presentAddress||'—');
           const phone=esc(cl.person?.contact||cl.company?.contact||'—');
           r+=`<tr>${td('Name','34%','','bold')}${td(':','3%')}${td(nm)}</tr>`;
@@ -1029,7 +1031,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
         } else {
           r+=`<tr>${td('No.','4%',T.info,'bold')}${td('Name','28%',T.info,'bold')}${td('Address','',T.info,'bold')}${td('Contact No.','16%',T.info,'bold')}</tr>`;
           cl0.forEach((cl,i)=>{
-            const nm=esc(cl.showPerson&&cl.person?.name?cl.person.name:cl.showCompany&&cl.company?.name?cl.company.name:'—');
+            const nm=esc(cl.showPerson&&cl.person?.name?fullName(cl.person):cl.showCompany&&cl.company?.name?cl.company.name:'—');
             const addr=esc(cl.person?.address||cl.company?.address||'—');
             const phone=esc(cl.person?.contact||cl.company?.contact||'—');
             r+=`<tr>${td(i+1,'4%')}${td(nm,'28%')}${td(addr)}${td(phone,'16%')}</tr>`;
@@ -1050,7 +1052,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
         if(!multiP && !multiO){
           const p=pr0[0]||{};
           const ow=ow0[0]||{};
-          const owName=esc(ow.showPerson&&ow.person?.name?ow.person.name:ow.showCompany&&ow.company?.name?ow.company.name:p.ownerName||'—');
+          const owName=esc(ow.showPerson&&ow.person?.name?fullName(ow.person):ow.showCompany&&ow.company?.name?ow.company.name:[p.ownerSalutation,p.ownerName].filter(Boolean).join(' ')||'—');
           const td=(v,w)=>`<td style="padding:2pt 5pt;border:0.75pt solid #bbb${w?';width:'+w:''}">${v}</td>`;
           const locVal = esc([p.addressLalpurja, p.location].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(', ') || '—');
           const preVal = esc(p.presentAddress || '—');
@@ -1072,7 +1074,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
         r+=th('Plot No.')+th('Area')+th('Trace Sheet No.')+`</tr></thead><tbody>`;
         pr0.forEach((p,pi)=>{
           const ow=ow0[pi]||ow0[0]||{};
-          const owName=esc(ow.showPerson&&ow.person?.name?ow.person.name:ow.showCompany&&ow.company?.name?ow.company.name:p.ownerName||'—');
+          const owName=esc(ow.showPerson&&ow.person?.name?fullName(ow.person):ow.showCompany&&ow.company?.name?ow.company.name:[p.ownerSalutation,p.ownerName].filter(Boolean).join(' ')||'—');
           r+=`<tr>`;
           if(multiO) r+=td2(owName);
           r+=td2(esc(p.plotNo))+td2(aFmt(p))+td2(esc(p.traceSheetNo))+`</tr>`;
@@ -1437,7 +1439,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
     <div class="remarks-box" style="padding:3pt 8pt;font-size:10pt;line-height:1.25;text-align:justify;white-space:normal"><p style="margin:0 0 2pt">This valuation was conducted for the purpose of establishing Fair Market and Distress Values of the said property for Client and Bank for mortgaging these properties. It is not to be used for any other purpose, and no part of this report is to be disseminated to the public or third parties.</p><p style="margin:0 0 2pt">We certify that our firm is fully authorized to carry out the valuation work under the prevalent laws and we are fully equipped and competent to carry out the assignment and have the necessary qualifications, skills and experience required for the same.</p><p style="margin:0 0 2pt">We also certify that no individual in our firm has any financial interest in the said property.</p><p style="margin:0 0 2pt">To the best of our knowledge, all matters of a factual nature discussed in this report are true and correct. No important factors have been intentionally overlooked or withheld.</p><p style="margin:0 0 2pt">We have physically inspected, verified and measured the properties in the presence of the Client/Representative of the Client.</p><p style="margin:0">We transformed all details and information furnished by the Client/Owner for above property and s/he confirmed all details is true in my presence.</p></div>
 
     <div class="sec-h3" style="margin-top:1pt">7.4 &nbsp; Declaration by the Client</div>
-    <div class="remarks-box" style="padding:3pt 8pt;font-size:10pt;line-height:1.25;text-align:justify;white-space:normal"><p style="margin:0 0 6pt">I/we have provided all the documents attached in this valuation report and all the details and information furnished above are true and correct. I take full responsibility in case of any liability occur regarding these documents. We, Owners/clients, hereby confirm that all the details and information furnished above are correct and represent the actual statements.</p><div style="display:flex;flex-wrap:wrap;gap:10pt;margin-top:3pt">${(s.clients||[]).map((cl,ci) => { const name=(cl.showPerson&&cl.person?.name)?cl.person.name:(cl.showCompany&&cl.company?.name)?cl.company.name:`Client ${ci+1}`; const contact=(cl.showPerson&&cl.person?.contact)?cl.person.contact:(cl.showCompany&&cl.company?.contact)?cl.company.contact:''; return `<div style="font-family:'Times New Roman',Times,serif;font-size:10pt;line-height:1.4;min-width:150pt"><div style="border-bottom:1pt dotted #555;min-width:180pt;margin-bottom:2pt">&nbsp;</div><div style="font-weight:bold">${esc(name,'Name of Client')}</div><div style="font-size:9pt;color:#444">${esc(contact,'Phone Number')}</div></div>`; }).join('')}</div></div>
+    <div class="remarks-box" style="padding:3pt 8pt;font-size:10pt;line-height:1.25;text-align:justify;white-space:normal"><p style="margin:0 0 6pt">I/we have provided all the documents attached in this valuation report and all the details and information furnished above are true and correct. I take full responsibility in case of any liability occur regarding these documents. We, Owners/clients, hereby confirm that all the details and information furnished above are correct and represent the actual statements.</p><div style="display:flex;flex-wrap:wrap;gap:10pt;margin-top:3pt">${(s.clients||[]).map((cl,ci) => { const name=(cl.showPerson&&cl.person?.name)?fullName(cl.person):(cl.showCompany&&cl.company?.name)?cl.company.name:`Client ${ci+1}`; const contact=(cl.showPerson&&cl.person?.contact)?cl.person.contact:(cl.showCompany&&cl.company?.contact)?cl.company.contact:''; return `<div style="font-family:'Times New Roman',Times,serif;font-size:10pt;line-height:1.4;min-width:150pt"><div style="border-bottom:1pt dotted #555;min-width:180pt;margin-bottom:2pt">&nbsp;</div><div style="font-weight:bold">${esc(name,'Name of Client')}</div><div style="font-size:9pt;color:#444">${esc(contact,'Phone Number')}</div></div>`; }).join('')}</div></div>
 
     <div class="sec-h3" style="margin-top:1pt">7.5 &nbsp; Certification</div>
     <div class="remarks-box" style="padding:3pt 8pt;font-size:10pt;line-height:1.25;text-align:justify;white-space:normal">I/We hereby certify that Valuation of the Properties as detailed in this report has been carried out by me/us in strict Compliance with Valuation Guidelines of <strong>${esc(s.bank,"[Bank Name]")}</strong>. The said property is an acceptable security to bank in all respects.</div>
@@ -1463,7 +1465,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
       // Client info for bill
       const billClient = (s.clients||[])[0] || {};
       const clientName = (billClient.showPerson && billClient.person?.name)
-        ? esc(billClient.person.name)
+        ? esc(fullName(billClient.person))
         : (billClient.showCompany && billClient.company?.name)
           ? esc(billClient.company.name) : "—";
       const clientAddr = (billClient.showPerson && billClient.person?.address)
@@ -1821,7 +1823,7 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
   // All clients
   const allClientNames = (s.clients||[]).map(cl => {
     const parts = [];
-    if (cl.showPerson  && cl.person?.name)  parts.push(esc(cl.person.name));
+    if (cl.showPerson  && cl.person?.name)  parts.push(esc(fullName(cl.person)));
     if (cl.showCompany && cl.company?.name) parts.push(esc(cl.company.name));
     return parts.join(" / ");
   }).filter(Boolean);

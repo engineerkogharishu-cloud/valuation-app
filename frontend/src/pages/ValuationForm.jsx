@@ -1338,6 +1338,14 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                 <div style={{gridColumn:"1 / -1"}}>
                 <Field label="Name of Owner" required>
                   <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+                    <select
+                      value={prop.ownerSalutation||""}
+                      onChange={e=>updateProperty(prop.id,{...prop,ownerSalutation:e.target.value})}
+                      style={{width:"90px",flexShrink:0}}
+                    >
+                      <option value="">—</option>
+                      {["Mr.","Mrs.","Ms.","Dr.","Prof.","Er.","Adv.","CA","Arch."].map(s=><option key={s} value={s}>{s}</option>)}
+                    </select>
                     <input
                       value={prop.ownerName}
                       onChange={e=>updateProperty(prop.id,{...prop,ownerName:e.target.value})}
@@ -1348,7 +1356,9 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                       defaultValue=""
                       onChange={e=>{
                         if(!e.target.value) return;
-                        updateProperty(prop.id,{...prop,ownerName:e.target.value});
+                        const selected = e.target.value;
+                        const ownerObj = owners.flatMap(ow=>ow.showPerson?[{sal:ow.person.salutation||"",name:ow.person.name}]:[]).find(o=>o.name===selected);
+                        updateProperty(prop.id,{...prop, ownerName:selected, ownerSalutation: ownerObj?.sal||prop.ownerSalutation||""});
                         e.target.value="";
                       }}
                       style={{
@@ -1364,7 +1374,10 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                       <option value="" disabled>👤 From Owners…</option>
                       {owners.flatMap((ow, oi) => {
                         const opts = [];
-                        if(ow.showPerson && ow.person.name) opts.push({label:`Owner ${oi+1} — ${ow.person.name}`, value: ow.person.name});
+                        if(ow.showPerson && ow.person.name) {
+                          const sal = ow.person.salutation ? ow.person.salutation+" " : "";
+                          opts.push({label:`Owner ${oi+1} — ${sal}${ow.person.name}`, value: ow.person.name});
+                        }
                         if(ow.showCompany && ow.company.name) opts.push({label:`Owner ${oi+1} — ${ow.company.name}`, value: ow.company.name});
                         if(!opts.length) opts.push({label:`Owner ${oi+1} (unnamed)`, value:""});
                         return opts;
