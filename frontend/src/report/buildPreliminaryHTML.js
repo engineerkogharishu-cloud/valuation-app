@@ -45,13 +45,17 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
 
   const fullName = (person) => [person?.salutation, person?.name].filter(Boolean).join(" ");
 
-  const personRows = (person) => `
+  const personRows = (person) => {
+    const married = person.salutation === "Mrs.";
+    return `
     <tr><td>Name</td><td>${esc(fullName(person))}</td><td>Citizenship No.</td><td>${esc(person.citizenshipNo)}</td></tr>
     <tr><td>Issued Date (BS)</td><td>${esc(person.issuedDate)}</td><td>Issued By</td><td>${esc(person.issuedBy)}</td></tr>
-    <tr><td>Father's Name</td><td>${esc(person.fatherName)}</td><td>Grandfather's Name</td><td>${esc(person.grandfatherName)}</td></tr>
-    <tr><td>Husband's Name</td><td>${esc(person.husbandName)}</td><td>Contact</td><td>${esc(person.contact)}</td></tr>
-    ${person.salutation==="Mrs."&&person.fatherInLawName?`<tr><td>Father-in-law's Name</td><td colspan="3">${esc(person.fatherInLawName)}</td></tr>`:''}
-    <tr><td>Address</td><td colspan="3">${esc(person.address)}</td></tr>`;
+    ${married
+      ? `<tr><td>Husband's Name</td><td>${esc(person.husbandName)}</td><td>Father-in-law's Name</td><td>${esc(person.fatherInLawName)}</td></tr>`
+      : `<tr><td>Father's Name</td><td>${esc(person.fatherName)}</td><td>Grandfather's Name</td><td>${esc(person.grandfatherName)}</td></tr>`
+    }
+    <tr><td>Contact</td><td>${esc(person.contact)}</td><td>Address</td><td>${esc(person.address)}</td></tr>`;
+  };
 
   // ── 3.1 Clients / Buyers
   const clientLabel = s.isBuySell ? "Buyer" : "Client";

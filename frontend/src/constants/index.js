@@ -10,7 +10,7 @@ export const BANKS = [
   "Janata Bank Nepal","Mega Bank","Shangrila Development Bank","Other"
 ];
 
-export const SALUTATIONS = ["Mr.", "Mrs.", "Ms.", "Dr.", "Prof.", "Er.", "Adv.", "CA", "Arch."];
+export const SALUTATIONS = ["Mr.", "Mrs.", "Ms."];
 
 export const LAND_TYPES = ["Agricultural","Residential","Commercial","Industrial","Forest","River/Water","Road","Other"];
 export const LAND_CATEGORIES = ["Aabal","Doyam","Sim","Chahar","Pancham"];
