@@ -86,6 +86,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
     <tr><td>Issued Date (BS)</td><td>${esc(person.issuedDate)}</td><td>Issued By</td><td>${esc(person.issuedBy)}</td></tr>
     <tr><td>Father's Name</td><td>${esc(person.fatherName)}</td><td>Grandfather's Name</td><td>${esc(person.grandfatherName)}</td></tr>
     <tr><td>Husband's Name</td><td>${esc(person.husbandName)}</td><td>Contact</td><td>${esc(person.contact)}</td></tr>
+    ${(person.husbandName||person.salutation==="Mrs.")&&person.fatherInLawName?`<tr><td>Father-in-law's Name</td><td colspan="3">${esc(person.fatherInLawName)}</td></tr>`:''}
     <tr><td>Address</td><td colspan="3">${esc(person.address)}</td></tr>`;
 
   // ── 3.1 Clients / Buyers

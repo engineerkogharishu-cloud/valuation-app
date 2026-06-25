@@ -21,12 +21,12 @@ export const uid = () => Math.random().toString(36).slice(2, 8);
 
 export const emptyDirector = () => ({
   id: uid(), salutation:"", name:"", citizenshipNo:"", issuedDate:"", issuedBy:"",
-  address:"", contact:"", fatherName:"", husbandName:"", grandfatherName:""
+  address:"", contact:"", fatherName:"", grandfatherName:"", husbandName:"", fatherInLawName:""
 });
 
 export const emptyPerson = () => ({
   salutation:"", name:"", citizenshipNo:"", issuedDate:"", issuedBy:"",
-  address:"", contact:"", fatherName:"", husbandName:"", grandfatherName:""
+  address:"", contact:"", fatherName:"", grandfatherName:"", husbandName:"", fatherInLawName:""
 });
 
 export const emptyCompanyData = () => ({
