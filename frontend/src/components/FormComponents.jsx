@@ -47,7 +47,7 @@ export function PersonForm({ data, onChange }) {
       <Field label="Father's Name"><input value={data.fatherName} onChange={e=>f("fatherName")(e.target.value)}/></Field>
       <Field label="Grandfather's Name"><input value={data.grandfatherName} onChange={e=>f("grandfatherName")(e.target.value)}/></Field>
       <Field label="Husband's Name"><input value={data.husbandName} onChange={e=>f("husbandName")(e.target.value)}/></Field>
-      {(data.husbandName || data.salutation === "Mrs.") && (
+      {data.salutation === "Mrs." && (
         <Field label="Father-in-law's Name"><input value={data.fatherInLawName||""} onChange={e=>f("fatherInLawName")(e.target.value)}/></Field>
       )}
       <Field label="Contact Number"><input value={data.contact} onChange={e=>f("contact")(e.target.value)} placeholder="98xxxxxxxx"/></Field>
