@@ -1,0 +1,18 @@
+{
+  "name": "nepal-valuation-app",
+  "version": "1.0.0",
+  "description": "Nepal Property Valuation Report — Full Stack (React + Node.js + SQLite)",
+  "private": true,
+  "scripts": {
+    "install:all":    "cd backend && npm install && cd ../frontend && npm install",
+    "start:backend":  "cd backend && npm start",
+    "start:dev":      "cd backend && npm run dev",
+    "start:frontend": "cd frontend && npm start",
+    "build":          "cd frontend && npm run build",
+    "start":          "cd backend && npm start"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm":  ">=9.0.0"
+  }
+}

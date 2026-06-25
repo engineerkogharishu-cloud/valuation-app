@@ -1,0 +1,8 @@
+# No build step needed — pure HTML with CDN scripts.
+# For drag-and-drop: just drag this entire "mobile" folder to Netlify.
+# For Git-connected deploys: set publish directory to "mobile" and leave build command empty.
+
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200

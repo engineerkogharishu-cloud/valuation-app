@@ -1,0 +1,19 @@
+{
+  "name": "valuation-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "dompurify": "^3.4.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.0"
+  },
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  }
+}
