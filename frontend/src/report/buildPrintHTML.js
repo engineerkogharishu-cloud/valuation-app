@@ -86,10 +86,8 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
     return `
     <tr><td>Name</td><td>${esc(fullName(person))}</td><td>Citizenship No.</td><td>${esc(person.citizenshipNo)}</td></tr>
     <tr><td>Issued Date (BS)</td><td>${esc(person.issuedDate)}</td><td>Issued By</td><td>${esc(person.issuedBy)}</td></tr>
-    ${married
-      ? `<tr><td>Husband's Name</td><td>${esc(person.husbandName)}</td><td>Father-in-law's Name</td><td>${esc(person.fatherInLawName)}</td></tr>`
-      : `<tr><td>Father's Name</td><td>${esc(person.fatherName)}</td><td>Grandfather's Name</td><td>${esc(person.grandfatherName)}</td></tr>`
-    }
+    <tr><td>Father's Name</td><td>${esc(person.fatherName)}</td><td>Grandfather's Name</td><td>${esc(person.grandfatherName)}</td></tr>
+    ${married ? `<tr><td>Husband's Name</td><td>${esc(person.husbandName)}</td><td>Father-in-law's Name</td><td>${esc(person.fatherInLawName)}</td></tr>` : ''}
     <tr><td>Contact</td><td>${esc(person.contact)}</td><td>Address</td><td>${esc(person.address)}</td></tr>`;
   };
 
