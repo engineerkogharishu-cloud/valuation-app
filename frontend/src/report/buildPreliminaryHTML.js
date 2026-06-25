@@ -2,6 +2,7 @@ import { propAreaSqm, areaDisplay, sqmToRadp, sqmToAana, sqmToBkd, sqmToDhur, AA
 const _uf  = (p) => p.areaUnit === "bkd" ? DHUR_TO_SQM : AANA_TO_SQM;
 const _ul  = (p) => p.areaUnit === "bkd" ? "Dhur" : "Aana";
 const _ud  = (p, sqm) => p.areaUnit === "bkd" ? sqmToDhur(sqm).toFixed(3) : sqmToAana(sqm).toFixed(4);
+const _uda = (p, sqm) => p.areaUnit === "bkd" ? sqmToDhur(sqm) : sqmToAana(sqm);
 const _nativeStr = (p, sqm) => {
   if (p.areaUnit === "bkd") { const x=sqmToBkd(sqm); return `${x.b}-${x.k}-${parseFloat(x.d).toFixed(3)}`; }
   const x=sqmToRadp(sqm); return `${x.r}-${x.a}-${x.p}-${x.d}`;
@@ -239,7 +240,7 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
   }).join('<div class="divider"></div>');
 
   // ── 10. Land Valuation
-  let totalLandCommercial = 0, totalLandFMV = 0;
+  let totalLandCommercial = 0, totalLandFMV = 0, totalLandGov = 0;
   const landValRows = mortProps.map(p => {
     const lSqm = propAreaSqm(p);
     const measured = parseFloat(s.areaMeasured?.[p.id]) || lSqm;
@@ -250,6 +251,9 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
 
     if (splits.length > 0) {
       let plotCommTotal = 0, plotFmvTotal = 0;
+      const spGovRate = parseFloat(splits[0]?.govRate) || 0;
+      const gVal = spGovRate * _uda(p, considered);
+      const gValR = Math.floor(gVal / 100) * 100;
       const zoneRows = splits.map(sp => {
         const spArea = parseFloat(sp.areaSqm) || 0;
         const spCRate = parseFloat(sp.commercialRate) || 0;
@@ -265,9 +269,11 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
           <td>${spArea.toFixed(3)}</td>
           <td>${_nativeStr(p, spArea)}</td>
           <td>${_ud(p, spArea)}</td>
+          <td style="color:#555;font-style:italic">—</td>
+          <td style="color:#555;font-style:italic">—</td>
           <td>${spCRate.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</td>
           <td>${spFmvRate.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</td>
-          <td>${spCVal.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</td>
+          <td style="color:#555;font-style:italic">—</td>
           <td>${spFVal.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</td>
         </tr>`;
       }).join("");
@@ -275,18 +281,21 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
       const fValR = Math.floor(plotFmvTotal / 100) * 100;
       totalLandCommercial += cValR;
       totalLandFMV += fValR;
+      totalLandGov += gValR;
       return `${zoneRows}
       <tr class="subtotal-row">
         <td>${esc(p.plotNo)} — Sub-total</td>
         <td>${considered.toFixed(3)}</td>
         <td>${_nativeStr(p, considered)}</td>
         <td>${_ud(p, considered)}</td>
+        <td style="color:#1565c0">${spGovRate ? spGovRate.toLocaleString("en-NP", { minimumFractionDigits: 2 }) : "—"}</td>
+        <td style="color:#1565c0"><strong>${gVal.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</strong></td>
         <td colspan="2" style="text-align:center;font-style:italic">Multiple rates</td>
         <td><strong>${plotCommTotal.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</strong></td>
         <td><strong>${plotFmvTotal.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</strong></td>
       </tr>
       <tr class="rounded-row">
-        <td colspan="6" style="font-size:9.5pt"><em>Rounded Down (nearest NPR 100)</em></td>
+        <td colspan="8" style="font-size:9.5pt"><em>Rounded Down (nearest NPR 100)</em></td>
         <td><strong>NPR ${cValR.toLocaleString("en-NP")}</strong></td>
         <td><strong>NPR ${fValR.toLocaleString("en-NP")}</strong></td>
       </tr>`;
@@ -299,22 +308,27 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
       const fmvRate = (cRate * commW / 100) + (govRate * govW / 100);
       const cVal = considered * cRate / _uf(p);
       const fVal = considered * fmvRate / _uf(p);
+      const gVal = govRate * _uda(p, considered);
       const cValR = Math.floor(cVal / 100) * 100;
       const fValR = Math.floor(fVal / 100) * 100;
+      const gValR = Math.floor(gVal / 100) * 100;
       totalLandCommercial += cValR;
       totalLandFMV += fValR;
+      totalLandGov += gValR;
       return `<tr>
         <td>${esc(p.plotNo)}</td>
         <td>${considered.toFixed(3)}</td>
         <td>${_nativeStr(p, considered)}</td>
         <td>${_ud(p, considered)}</td>
+        <td style="color:#1565c0">${govRate.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</td>
+        <td style="color:#1565c0">${gVal.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</td>
         <td>${cRate.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</td>
         <td>${fmvRate.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</td>
         <td>${cVal.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</td>
         <td>${fVal.toLocaleString("en-NP", { minimumFractionDigits: 2 })}</td>
       </tr>
       <tr class="rounded-row">
-        <td colspan="6" style="font-size:9.5pt"><em>Rounded Down (nearest NPR 100)</em></td>
+        <td colspan="8" style="font-size:9.5pt"><em>Rounded Down (nearest NPR 100)</em></td>
         <td><strong>NPR ${cValR.toLocaleString("en-NP")}</strong></td>
         <td><strong>NPR ${fValR.toLocaleString("en-NP")}</strong></td>
       </tr>`;
@@ -859,15 +873,19 @@ ${s.hasBuilding === "skip"
     <th class="th-light">Considered (sq.m)</th>
     <th class="th-light" style="min-width:52pt">${nativeHdr}</th>
     <th class="th-light">${unitHdr}</th>
+    <th class="th-light" style="color:#1565c0">Govt. Rate (NPR/${unitHdr})</th>
+    <th class="th-light" style="color:#1565c0">Govt. Value (NPR)</th>
     <th class="th-light">Commercial Rate (NPR/${unitHdr})</th>
     <th class="th-light">FMV Rate (NPR/${unitHdr})</th>
     <th class="th-light">Commercial Value (NPR)</th>
     <th class="th-light">FMV Value (NPR)</th>
   </tr></thead>
   <tbody>
-    ${landValRows || `<tr><td colspan="8" class="empty-cell">No data</td></tr>`}
+    ${landValRows || `<tr><td colspan="10" class="empty-cell">No data</td></tr>`}
     <tr class="total-row">
-      <td colspan="6"><strong>TOTAL LAND VALUE (Rounded Down)</strong></td>
+      <td colspan="4"><strong>TOTAL LAND VALUE (Rounded Down)</strong></td>
+      <td colspan="2" style="color:#1565c0"><strong>NPR ${totalLandGov.toLocaleString("en-NP")}</strong></td>
+      <td colspan="2"></td>
       <td><strong>NPR ${totalLandCommercial.toLocaleString("en-NP")}</strong></td>
       <td><strong>NPR ${totalLandFMV.toLocaleString("en-NP")}</strong></td>
     </tr>
