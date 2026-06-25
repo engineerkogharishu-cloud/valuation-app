@@ -8,21 +8,53 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #f0f2f5; font-family: 'Segoe UI', Arial, sans-serif; }
-    input, select, textarea, button { font-family: inherit; }
-  </style>
 </head>
 <body>
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+    const { useState, useEffect, useRef, useCallback } = React;
 
-    const params   = new URLSearchParams(window.location.search);
-    const TOKEN    = params.get("collect") || "";
-    const API_BASE = (params.get("api") || "") + "/api";
+    // ── URL params ───────────────────────────────────────────────────
+    const params     = new URLSearchParams(window.location.search);
+    const SHORT_CODE = (params.get("c") || "").toUpperCase();        // new short link
+    const LEG_TOKEN  = params.get("collect") || "";                  // legacy token
+    const LEG_API    = (params.get("api") || "").replace(/\/$/, ""); // legacy api base
+
+    // ── IndexedDB offline queue ──────────────────────────────────────
+    const DB_NAME    = "fieldApp";
+    const DB_VERSION = 1;
+    const STORE      = "queue";
+
+    function openIDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = e => e.target.result.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror   = () => reject(req.error);
+      });
+    }
+
+    async function idbAdd(record) {
+      const db  = await openIDB();
+      const tx  = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).add(record);
+      return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+    }
+
+    async function idbGetAll() {
+      const db  = await openIDB();
+      const tx  = db.transaction(STORE, "readonly");
+      const req = tx.objectStore(STORE).getAll();
+      return new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = rej; });
+    }
+
+    async function idbDelete(id) {
+      const db  = await openIDB();
+      const tx  = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).delete(id);
+      return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+    }
 
     // ── OLC / Plus Code ──────────────────────────────────────────────
     const OLC = "23456789CFGHJMPQRVWX";
@@ -40,7 +72,7 @@
       c.splice(8,0,"+"); return c.join("");
     }
 
-    // ── Photo compression ────────────────────────────────────────────
+    // ── Photo compression ─────────────────────────────────────────────
     function compress(file) {
       return new Promise(resolve => {
         const r = new FileReader();
@@ -59,21 +91,18 @@
       });
     }
 
-    // ── Data ─────────────────────────────────────────────────────────
+    // ── Data defaults ─────────────────────────────────────────────────
     const todayISO = () => new Date().toISOString().slice(0,10);
-
     const EMPTY_FORM = {
       submitterName:"", clientName:"", ownerName:"", location:"",
       bank:"", branch:"", visitDate:todayISO(), notes:"",
       lat:"", lng:"", googlePlusCode:"",
       landMarketRate:"", buildingRate:"",
     };
-
-    const EMPTY_ROAD = {type:"", width:"", side:"", surface:"", remarks:""};
-    const ROAD_TYPES   = ["Pitched / Black Topped","Graveled","Earthen / Kachchi","Goreto / Footpath","Under Construction"];
-    const ROAD_SIDES   = ["North","South","East","West","North-East","North-West","South-East","South-West"];
+    const EMPTY_ROAD    = {type:"", width:"", side:"", surface:"", remarks:""};
+    const ROAD_TYPES    = ["Pitched / Black Topped","Graveled","Earthen / Kachchi","Goreto / Footpath","Under Construction"];
+    const ROAD_SIDES    = ["North","South","East","West","North-East","North-West","South-East","South-West"];
     const ROAD_SURFACES = ["Good","Fair","Poor"];
-
     const EMPTY_HAZARDS = {
       highTensionLine:false, highTensionLineComment:"", highTensionLineDistance:"", highTensionLineSide:"",
       river:false, riverComment:"", riverDistance:"", riverSide:"",
@@ -83,7 +112,6 @@
       graveyard:false, graveyardComment:"", graveyardDistance:"", graveyardSide:"",
       encroachment:false, encroachmentComment:"", encroachmentSide:"",
     };
-
     const HAZARDS = [
       {key:"highTensionLine", label:"⚡ High Tension Line",    dist:true,  side:true },
       {key:"river",           label:"🌊 River",                dist:true,  side:true },
@@ -93,84 +121,176 @@
       {key:"graveyard",       label:"⚰ Graveyard / Cemetery", dist:true,  side:true },
       {key:"encroachment",    label:"🚧 Encroachment",         dist:false, side:true },
     ];
-
     const SIDES = ["North","South","East","West","North-East","North-West","South-East","South-West","Adjacent / On boundary","Multiple sides"];
 
-    // ── Styles ───────────────────────────────────────────────────────
+    // ── Styles ────────────────────────────────────────────────────────
     const S = {
       page:        {minHeight:"100vh",background:"#f0f2f5"},
-      header:      {background:"#0f1f3d",padding:"18px 20px 16px",display:"flex",alignItems:"center",gap:12},
-      card:        {background:"#fff",margin:"0 auto",maxWidth:520,padding:"24px 20px 32px",boxShadow:"0 2px 12px rgba(0,0,0,0.08)"},
+      header:      {background:"#0f1f3d",padding:"14px 16px",display:"flex",alignItems:"center",gap:10},
+      offlineBanner:{background:"#e65100",color:"#fff",textAlign:"center",fontSize:13,fontWeight:600,padding:"7px 16px",display:"flex",alignItems:"center",justifyContent:"center",gap:8},
+      syncBanner:  {background:"#1565c0",color:"#fff",textAlign:"center",fontSize:13,fontWeight:600,padding:"7px 16px",display:"flex",alignItems:"center",justifyContent:"center",gap:8,cursor:"pointer"},
+      card:        {background:"#fff",margin:"0 auto",maxWidth:520,padding:"20px 16px 32px",boxShadow:"0 2px 12px rgba(0,0,0,0.08)"},
       label:       {display:"block",fontSize:13,fontWeight:600,color:"#444",marginBottom:6},
-      input:       {width:"100%",padding:"12px 14px",border:"1.5px solid #ddd",borderRadius:8,fontSize:15,boxSizing:"border-box",outline:"none"},
-      select:      {width:"100%",padding:"12px 14px",border:"1.5px solid #ddd",borderRadius:8,fontSize:15,boxSizing:"border-box",background:"#fff"},
-      btnShare:    {padding:"9px 16px",background:"rgba(255,255,255,0.15)",color:"#fff",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,cursor:"pointer",fontSize:14,fontWeight:600,whiteSpace:"nowrap",flexShrink:0},
-      btnGps:      {padding:"12px 14px",background:"#0f1f3d",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:600,whiteSpace:"nowrap",fontSize:14},
-      btnPhoto:    {width:"100%",padding:"13px",background:"#f5f5f5",border:"1.5px dashed #bbb",borderRadius:8,cursor:"pointer",fontSize:15,color:"#555",marginBottom:12},
-      btnSubmit:   {width:"100%",padding:"15px",background:"#c9922a",color:"#fff",border:"none",borderRadius:10,fontSize:17,fontWeight:700,cursor:"pointer",marginTop:8},
-      btnOutline:  {width:"100%",padding:"13px",background:"#fff",color:"#0f1f3d",border:"2px solid #0f1f3d",borderRadius:10,fontSize:15,fontWeight:700,cursor:"pointer"},
-      btnSecondary:{marginTop:16,padding:"12px 28px",background:"#0f1f3d",color:"#fff",border:"none",borderRadius:8,fontSize:15,cursor:"pointer",fontWeight:600},
-      btnAddPlot:  {padding:"8px 14px",background:"#f0f4ff",color:"#0f1f3d",border:"1px solid #c0cfe8",borderRadius:7,cursor:"pointer",fontSize:13,fontWeight:600},
-      btnRmPlot:   {padding:"10px 12px",background:"#fff0f0",color:"#c0392b",border:"1px solid #f5c6c6",borderRadius:7,cursor:"pointer",fontSize:13,flexShrink:0},
-      divider:     {display:"flex",alignItems:"center",gap:10,margin:"14px 0 12px",color:"#aaa",fontSize:13},
-      hint:        {textAlign:"center",fontSize:12,color:"#888",margin:"8px 0 0",lineHeight:1.5},
-      rateBox:     {border:"1.5px solid #e0e8f0",borderRadius:10,padding:"14px 14px 10px",marginBottom:18,background:"#f8fbff"},
-      boxTitle:    {fontSize:13,fontWeight:700,color:"#0f1f3d",marginBottom:12},
-      rateRow:     {display:"flex",gap:12},
+      input:       {width:"100%",padding:"11px 13px",border:"1.5px solid #ddd",borderRadius:8,fontSize:15,boxSizing:"border-box",outline:"none"},
+      select:      {width:"100%",padding:"11px 13px",border:"1.5px solid #ddd",borderRadius:8,fontSize:15,boxSizing:"border-box",background:"#fff"},
+      btnShare:    {padding:"8px 14px",background:"rgba(255,255,255,0.15)",color:"#fff",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600,whiteSpace:"nowrap",flexShrink:0},
+      btnGps:      {padding:"11px 13px",background:"#0f1f3d",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:600,whiteSpace:"nowrap",fontSize:14},
+      btnPhoto:    {width:"100%",padding:"12px",background:"#f5f5f5",border:"1.5px dashed #bbb",borderRadius:8,cursor:"pointer",fontSize:15,color:"#555",marginBottom:10},
+      btnSubmit:   {width:"100%",padding:"14px",background:"#c9922a",color:"#fff",border:"none",borderRadius:10,fontSize:17,fontWeight:700,cursor:"pointer",marginTop:8},
+      btnOffline:  {width:"100%",padding:"14px",background:"#546e7a",color:"#fff",border:"none",borderRadius:10,fontSize:17,fontWeight:700,cursor:"pointer",marginTop:8},
+      btnOutline:  {width:"100%",padding:"12px",background:"#fff",color:"#0f1f3d",border:"2px solid #0f1f3d",borderRadius:10,fontSize:15,fontWeight:700,cursor:"pointer"},
+      btnSecondary:{marginTop:14,padding:"11px 24px",background:"#0f1f3d",color:"#fff",border:"none",borderRadius:8,fontSize:15,cursor:"pointer",fontWeight:600},
+      btnAddPlot:  {padding:"7px 13px",background:"#f0f4ff",color:"#0f1f3d",border:"1px solid #c0cfe8",borderRadius:7,cursor:"pointer",fontSize:13,fontWeight:600},
+      btnRmPlot:   {padding:"9px 11px",background:"#fff0f0",color:"#c0392b",border:"1px solid #f5c6c6",borderRadius:7,cursor:"pointer",fontSize:13,flexShrink:0},
+      divider:     {display:"flex",alignItems:"center",gap:10,margin:"12px 0 10px",color:"#aaa",fontSize:13},
+      hint:        {textAlign:"center",fontSize:12,color:"#888",margin:"7px 0 0",lineHeight:1.5},
+      rateBox:     {border:"1.5px solid #e0e8f0",borderRadius:10,padding:"13px 13px 10px",marginBottom:16,background:"#f8fbff"},
+      boxTitle:    {fontSize:13,fontWeight:700,color:"#0f1f3d",marginBottom:10},
+      rateRow:     {display:"flex",gap:10},
       unit:        {fontWeight:400,color:"#888",fontSize:11},
-      roadBox:     {border:"1.5px solid #c8dff0",borderRadius:10,padding:"14px 14px 12px",marginBottom:18,background:"#eef5fb"},
-      hazardBox:   {border:"1.5px solid #fde8c8",borderRadius:10,padding:"14px 14px 12px",marginBottom:18,background:"#fffaf4"},
+      roadBox:     {border:"1.5px solid #c8dff0",borderRadius:10,padding:"13px 13px 11px",marginBottom:16,background:"#eef5fb"},
+      hazardBox:   {border:"1.5px solid #fde8c8",borderRadius:10,padding:"13px 13px 11px",marginBottom:16,background:"#fffaf4"},
       hCheck:      {width:20,height:20,borderRadius:4,border:"1.5px solid #ccc",background:"#f5f5f5",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#c9922a",fontWeight:700,flexShrink:0},
       hCheckOn:    {border:"1.5px solid #c9922a",background:"#fff3d6"},
       subLabel:    {fontSize:11,fontWeight:700,color:"#888",letterSpacing:"0.4px",marginBottom:4},
-      errorBox:    {background:"#fff3cd",border:"1px solid #ffc107",borderRadius:8,padding:"12px 16px",marginBottom:16,color:"#7a5000",fontSize:14},
+      errorBox:    {background:"#fff3cd",border:"1px solid #ffc107",borderRadius:8,padding:"11px 15px",marginBottom:14,color:"#7a5000",fontSize:14},
       photoGrid:   {display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8},
       photoThumb:  {position:"relative",aspectRatio:"1",borderRadius:6,overflow:"hidden",border:"1px solid #ddd"},
       photoRm:     {position:"absolute",top:3,right:3,background:"rgba(0,0,0,0.6)",color:"#fff",border:"none",borderRadius:"50%",width:22,height:22,cursor:"pointer",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"},
+      loadPage:    {minHeight:"100vh",background:"#0f1f3d",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,padding:24},
+      loadText:    {color:"rgba(255,255,255,0.8)",fontSize:16,textAlign:"center"},
+      errPage:     {minHeight:"100vh",background:"#f0f2f5",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,padding:24,textAlign:"center"},
     };
 
     function F({label,children}) {
-      return <div style={{marginBottom:18}}><label style={S.label}>{label}</label>{children}</div>;
+      return <div style={{marginBottom:16}}><label style={S.label}>{label}</label>{children}</div>;
     }
 
-    // ── App ──────────────────────────────────────────────────────────
+    // ── Main App ──────────────────────────────────────────────────────
     function App() {
+      const [appState,    setAppState]    = useState("loading"); // loading | error | form | success
+      const [errorMsg,    setErrorMsg]    = useState("");
+      const [apiBase,     setApiBase]     = useState("");
+      const [shortCode,   setShortCode]   = useState("");
       const [companyName, setCompanyName] = useState("");
       const [banks,       setBanks]       = useState([]);
+      const [isOnline,    setIsOnline]    = useState(navigator.onLine);
+      const [queueCount,  setQueueCount]  = useState(0);
+      const [syncing,     setSyncing]     = useState(false);
+
       const [form,        setForm]        = useState(EMPTY_FORM);
       const [hazards,     setHazards]     = useState(EMPTY_HAZARDS);
       const [plotNos,     setPlotNos]     = useState([""]);
       const [roads,       setRoads]       = useState([{...EMPTY_ROAD}]);
       const [photos,      setPhotos]      = useState([]);
       const [submitting,  setSubmitting]  = useState(false);
-      const [submitted,   setSubmitted]   = useState(false);
       const [submitError, setSubmitError] = useState("");
       const [gpsLoading,  setGpsLoading]  = useState(false);
       const [shareCopied, setShareCopied] = useState(false);
       const fileRef = useRef();
 
-      // Fetch company name + banks if token present
-      useEffect(() => {
-        if (!TOKEN || !params.get("api")) return;
-        fetch(`${API_BASE}/field/company-info?token=${encodeURIComponent(TOKEN)}`)
-          .then(r => r.json())
-          .then(d => {
-            if (!d.error) {
-              setCompanyName(d.companyName || d.companyCode || "");
-              setBanks(Array.isArray(d.banks) ? d.banks : []);
-            }
-          })
-          .catch(() => {});
+      // Load queue count
+      const refreshQueue = useCallback(async () => {
+        const items = await idbGetAll();
+        setQueueCount(items.length);
       }, []);
+
+      // Online/offline listeners
+      useEffect(() => {
+        const goOnline  = () => { setIsOnline(true);  refreshQueue(); };
+        const goOffline = () => setIsOnline(false);
+        window.addEventListener("online",  goOnline);
+        window.addEventListener("offline", goOffline);
+        return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
+      }, [refreshQueue]);
+
+      // Resolve link on mount
+      useEffect(() => {
+        async function resolve() {
+          try {
+            if (SHORT_CODE) {
+              // New short-code flow
+              if (!navigator.onLine) {
+                // Offline but we have a cached short code — allow form use
+                const cached = JSON.parse(localStorage.getItem(`link_${SHORT_CODE}`) || "null");
+                if (cached) {
+                  setApiBase(cached.apiUrl); setShortCode(SHORT_CODE);
+                  setCompanyName(cached.companyName); setBanks(cached.banks || []);
+                  await refreshQueue(); setAppState("form"); return;
+                }
+                // No cache — show offline error
+                setErrorMsg("You are offline and this link has not been used before. Please connect to the internet first.");
+                setAppState("error"); return;
+              }
+              // Online — resolve from server
+              // Try to detect the API base from the current page URL or a known env
+              const apiGuess = window.FIELD_API_BASE || "";
+              if (!apiGuess) {
+                setErrorMsg("API base not configured. Please contact your administrator.");
+                setAppState("error"); return;
+              }
+              const r = await fetch(`${apiGuess}/api/field/link/${SHORT_CODE}`);
+              const d = await r.json();
+              if (!r.ok) { setErrorMsg(d.error || "Invalid link"); setAppState("error"); return; }
+              localStorage.setItem(`link_${SHORT_CODE}`, JSON.stringify(d));
+              setApiBase(d.apiUrl); setShortCode(SHORT_CODE);
+              setCompanyName(d.companyName); setBanks(d.banks || []);
+              await refreshQueue(); setAppState("form");
+
+            } else if (LEG_TOKEN && LEG_API) {
+              // Legacy flow
+              setApiBase(LEG_API); setShortCode("");
+              if (navigator.onLine) {
+                const r = await fetch(`${LEG_API}/api/field/company-info?token=${encodeURIComponent(LEG_TOKEN)}`);
+                const d = await r.json();
+                if (!d.error) { setCompanyName(d.companyName || ""); setBanks(d.banks || []); }
+              }
+              await refreshQueue(); setAppState("form");
+
+            } else {
+              setErrorMsg("No valid collection link found. Please use a link provided by your administrator.");
+              setAppState("error");
+            }
+          } catch(e) {
+            setErrorMsg("Could not load link: " + e.message);
+            setAppState("error");
+          }
+        }
+        resolve();
+      }, []);
+
+      // Sync offline queue to server
+      const syncQueue = useCallback(async () => {
+        if (!isOnline || syncing || !apiBase) return;
+        const items = await idbGetAll();
+        if (!items.length) return;
+        setSyncing(true);
+        let synced = 0;
+        for (const item of items) {
+          try {
+            const body = shortCode
+              ? { short_code: shortCode, data: item.data, photos: item.photos }
+              : { token: LEG_TOKEN, data: item.data, photos: item.photos };
+            const r = await fetch(`${apiBase}/api/field/submit`, {
+              method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body)
+            });
+            if (r.ok) { await idbDelete(item.id); synced++; }
+          } catch(_) {}
+        }
+        await refreshQueue();
+        setSyncing(false);
+        if (synced) alert(`✅ ${synced} offline submission${synced>1?"s":""} synced to server!`);
+      }, [isOnline, syncing, apiBase, shortCode, refreshQueue]);
+
+      // Auto-sync when coming back online
+      useEffect(() => { if (isOnline && queueCount > 0) syncQueue(); }, [isOnline]);
 
       const set  = k => e => setForm(f => ({...f,[k]:e.target.value}));
       const setH = (k,v) => setHazards(h => ({...h,[k]:v}));
       const togH = k => setHazards(h => ({...h,[k]:!h[k]}));
-
       const setPlot = (i,v) => setPlotNos(p => p.map((x,j)=>j===i?v:x));
       const addPlot = () => setPlotNos(p=>[...p,""]);
       const rmPlot  = i => setPlotNos(p=>p.filter((_,j)=>j!==i));
-
       const setRoadField = (i,k,v) => setRoads(r=>r.map((row,j)=>j===i?{...row,[k]:v}:row));
       const addRoad  = () => setRoads(r=>[...r,{...EMPTY_ROAD}]);
       const rmRoad   = i => setRoads(r=>r.filter((_,j)=>j!==i));
@@ -197,28 +317,26 @@
         );
       };
 
-      const payload = () => ({
-        data:{...form, plotNos:plotNos.map(p=>p.trim()).filter(Boolean), roads:roads.filter(r=>r.type||r.width||r.side||r.surface||r.remarks), hazards},
+      const buildPayload = () => ({
+        data: {...form, plotNos:plotNos.map(p=>p.trim()).filter(Boolean),
+               roads:roads.filter(r=>r.type||r.width||r.side||r.surface||r.remarks), hazards},
         photos,
       });
 
       const handleShareUrl = async () => {
         const url = window.location.href;
-        if (navigator.share) {
-          try { await navigator.share({title:"Field Data Collection",url}); return; } catch(_){}
-        }
+        if (navigator.share) { try { await navigator.share({title:"Field Data Collection",url}); return; } catch(_){} }
         await navigator.clipboard.writeText(url);
         setShareCopied(true); setTimeout(()=>setShareCopied(false),2500);
       };
 
       const handleShareFile = async () => {
-        const p = payload();
+        const p = buildPayload();
         const name = `field-${form.clientName.replace(/\s+/g,"-")||"entry"}-${Date.now()}.json`;
         const blob = new Blob([JSON.stringify(p,null,2)],{type:"application/json"});
         const file = new File([blob],name,{type:"application/json"});
         if (navigator.share && navigator.canShare?.({files:[file]})) {
-          try { await navigator.share({title:"Field Data",files:[file]}); return; } catch(_){}
-        }
+          try { await navigator.share({title:"Field Data",files:[file]}); return; } catch(_){} }
         const url=URL.createObjectURL(blob), a=document.createElement("a");
         a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url);
       };
@@ -228,17 +346,32 @@
         if (!form.clientName.trim() && !form.location.trim())
           return setSubmitError("Please enter at least a client name or location.");
         setSubmitting(true); setSubmitError("");
-        const {data,photos:pics} = payload();
+        const {data, photos:pics} = buildPayload();
+
+        if (!isOnline) {
+          // Save to offline queue
+          await idbAdd({data, photos:pics, savedAt: new Date().toISOString()});
+          await refreshQueue();
+          setSubmitting(false);
+          setAppState("success_offline");
+          return;
+        }
+
         try {
-          const res  = await fetch(`${API_BASE}/field/submit`,{
-            method:"POST", headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({token:TOKEN,data,photos:pics}),
+          const body = shortCode
+            ? { short_code: shortCode, data, photos: pics }
+            : { token: LEG_TOKEN, data, photos: pics };
+          const res  = await fetch(`${apiBase}/api/field/submit`, {
+            method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body),
           });
           const json = await res.json();
           if (!res.ok) throw new Error(json.error||"Submission failed");
-          setSubmitted(true);
+          setAppState("success");
         } catch(err) {
-          setSubmitError(err.message);
+          // Network error — save offline
+          await idbAdd({data, photos:pics, savedAt: new Date().toISOString()});
+          await refreshQueue();
+          setSubmitError("No internet — saved offline. Will sync automatically when connected.");
         } finally {
           setSubmitting(false);
         }
@@ -246,36 +379,76 @@
 
       const reset = () => {
         setForm({...EMPTY_FORM, visitDate:todayISO()}); setHazards(EMPTY_HAZARDS);
-        setPlotNos([""]); setRoads([{...EMPTY_ROAD}]); setPhotos([]); setSubmitted(false);
+        setPlotNos([""]); setRoads([{...EMPTY_ROAD}]); setPhotos([]); setAppState("form");
       };
 
-      if (submitted) return (
+      // ── Render states ─────────────────────────────────────────────
+      if (appState === "loading") return (
+        <div style={S.loadPage}>
+          <div style={{fontSize:48}}>📋</div>
+          <div style={S.loadText}>Loading collection form…</div>
+        </div>
+      );
+
+      if (appState === "error") return (
+        <div style={S.errPage}>
+          <div style={{fontSize:56}}>🔗</div>
+          <h2 style={{color:"#c0392b",margin:0}}>Invalid Link</h2>
+          <p style={{color:"#555",maxWidth:340}}>{errorMsg}</p>
+        </div>
+      );
+
+      if (appState === "success") return (
         <div style={S.page}>
           <div style={{...S.card,textAlign:"center",paddingTop:48}}>
-            <div style={{fontSize:60,marginBottom:12}}>✅</div>
+            <div style={{fontSize:60,marginBottom:10}}>✅</div>
             <h2 style={{color:"#1a7a3f",margin:"0 0 8px"}}>Submitted!</h2>
-            <p style={{color:"#555",fontSize:15}}>
-              Field data sent{companyName ? ` to ${companyName}` : ""}.
-            </p>
+            <p style={{color:"#555",fontSize:15}}>Field data sent{companyName ? ` to ${companyName}` : ""}.</p>
+            {queueCount > 0 && (
+              <p style={{color:"#e65100",fontSize:13,marginTop:8}}>📦 {queueCount} offline item(s) still pending sync.</p>
+            )}
             <button style={S.btnSecondary} onClick={reset}>Submit Another</button>
           </div>
         </div>
       );
 
+      if (appState === "success_offline") return (
+        <div style={S.page}>
+          <div style={{...S.card,textAlign:"center",paddingTop:48}}>
+            <div style={{fontSize:60,marginBottom:10}}>💾</div>
+            <h2 style={{color:"#e65100",margin:"0 0 8px"}}>Saved Offline</h2>
+            <p style={{color:"#555",fontSize:15}}>You are offline. Data saved on this device ({queueCount} pending).</p>
+            <p style={{color:"#777",fontSize:13}}>It will be sent automatically when you reconnect to internet.</p>
+            <button style={S.btnSecondary} onClick={reset}>Add Another Entry</button>
+          </div>
+        </div>
+      );
+
+      // ── Main form ─────────────────────────────────────────────────
       return (
         <div style={S.page}>
+
+          {/* Offline / Sync banners */}
+          {!isOnline && (
+            <div style={S.offlineBanner}>
+              📵 Offline — submissions will be saved locally and synced when connected
+            </div>
+          )}
+          {isOnline && queueCount > 0 && (
+            <div style={S.syncBanner} onClick={syncQueue}>
+              {syncing ? "⏳ Syncing…" : `📤 ${queueCount} offline submission${queueCount>1?"s":""} pending — tap to sync`}
+            </div>
+          )}
 
           {/* Header */}
           <div style={S.header}>
             <div style={{flex:1}}>
-              <div style={{fontSize:22,fontWeight:700,color:"#fff"}}>📋 Field Data Collection</div>
-              {companyName && <div style={{fontSize:13,color:"rgba(255,255,255,0.75)",marginTop:2}}>{companyName}</div>}
+              <div style={{fontSize:20,fontWeight:700,color:"#fff"}}>📋 Field Data Collection</div>
+              {companyName && <div style={{fontSize:12,color:"rgba(255,255,255,0.72)",marginTop:2}}>{companyName}</div>}
             </div>
-            {TOKEN && (
-              <button type="button" onClick={handleShareUrl} style={S.btnShare}>
-                {shareCopied?"✓ Copied":"🔗 Share"}
-              </button>
-            )}
+            <button type="button" onClick={handleShareUrl} style={S.btnShare}>
+              {shareCopied?"✓ Copied":"🔗 Share"}
+            </button>
           </div>
 
           <form onSubmit={handleSubmit} style={S.card}>
@@ -298,8 +471,7 @@
                     <option value="">— Select bank —</option>
                     {banks.map(b=><option key={b} value={b}>{b}</option>)}
                   </select>
-                : <input style={S.input} value={form.bank} onChange={set("bank")} placeholder="Bank name" autoComplete="off" />
-              }
+                : <input style={S.input} value={form.bank} onChange={set("bank")} placeholder="Bank name" autoComplete="off" />}
             </F>
 
             <F label="Branch">
@@ -315,7 +487,7 @@
             </F>
 
             {/* Plot numbers */}
-            <div style={{marginBottom:18}}>
+            <div style={{marginBottom:16}}>
               <label style={S.label}>Plot Number(s)</label>
               {plotNos.map((val,i)=>(
                 <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
@@ -332,13 +504,13 @@
             <div style={S.roadBox}>
               <div style={S.boxTitle}>🛣️ Road Details</div>
               {roads.map((road,i)=>(
-                <div key={i} style={{border:"1.5px solid #c8dff0",borderRadius:8,padding:"12px 12px 10px",marginBottom:10,background:"#f4f9ff",position:"relative"}}>
+                <div key={i} style={{border:"1.5px solid #c8dff0",borderRadius:8,padding:"11px 11px 9px",marginBottom:9,background:"#f4f9ff",position:"relative"}}>
                   {roads.length>1 && (
                     <button type="button" onClick={()=>rmRoad(i)}
-                      style={{position:"absolute",top:8,right:8,padding:"4px 9px",background:"#fff0f0",color:"#c0392b",border:"1px solid #f5c6c6",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700}}>✕</button>
+                      style={{position:"absolute",top:7,right:7,padding:"3px 8px",background:"#fff0f0",color:"#c0392b",border:"1px solid #f5c6c6",borderRadius:6,cursor:"pointer",fontSize:12,fontWeight:700}}>✕</button>
                   )}
-                  {roads.length>1 && <div style={{fontSize:12,fontWeight:700,color:"#0f1f3d",marginBottom:10}}>Road {i+1}</div>}
-                  <div style={{display:"flex",gap:10,marginBottom:10}}>
+                  {roads.length>1 && <div style={{fontSize:12,fontWeight:700,color:"#0f1f3d",marginBottom:9}}>Road {i+1}</div>}
+                  <div style={{display:"flex",gap:9,marginBottom:9}}>
                     <div style={{flex:1}}>
                       <div style={S.subLabel}>TYPE</div>
                       <select style={{...S.select,fontSize:13}} value={road.type} onChange={e=>setRoadField(i,"type",e.target.value)}>
@@ -354,7 +526,7 @@
                       </select>
                     </div>
                   </div>
-                  <div style={{display:"flex",gap:10,marginBottom:10}}>
+                  <div style={{display:"flex",gap:9,marginBottom:9}}>
                     <div style={{flex:1}}>
                       <div style={S.subLabel}>WIDTH (ft)</div>
                       <input style={{...S.input,fontSize:13}} type="number" min="0" value={road.width}
@@ -420,22 +592,22 @@
             </F>
 
             <F label="Notes / Observations">
-              <textarea style={{...S.input,height:90,resize:"vertical"}} value={form.notes} onChange={set("notes")} placeholder="Any relevant observations, remarks…" />
+              <textarea style={{...S.input,height:80,resize:"vertical"}} value={form.notes} onChange={set("notes")} placeholder="Any relevant observations, remarks…" />
             </F>
 
             {/* Hazards */}
             <div style={S.hazardBox}>
               <div style={S.boxTitle}>⚠️ Hazards / Encumbrances</div>
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{display:"flex",flexDirection:"column",gap:9}}>
                 {HAZARDS.map(({key,label,dist,side})=>(
-                  <div key={key} style={{border:`1.5px solid ${hazards[key]?"#f0c070":"#e5e7eb"}`,borderRadius:8,padding:"10px 12px",background:hazards[key]?"#fffaf4":"#fff"}}>
+                  <div key={key} style={{border:`1.5px solid ${hazards[key]?"#f0c070":"#e5e7eb"}`,borderRadius:8,padding:"9px 11px",background:hazards[key]?"#fffaf4":"#fff"}}>
                     <button type="button" onClick={()=>togH(key)}
-                      style={{display:"flex",alignItems:"center",gap:10,border:"none",background:"transparent",padding:0,width:"100%",cursor:"pointer",marginBottom:hazards[key]?10:0}}>
+                      style={{display:"flex",alignItems:"center",gap:10,border:"none",background:"transparent",padding:0,width:"100%",cursor:"pointer",marginBottom:hazards[key]?9:0}}>
                       <span style={{...S.hCheck,...(hazards[key]?S.hCheckOn:{})}}>{hazards[key]?"✓":""}</span>
-                      <span style={{fontSize:15,fontWeight:hazards[key]?700:400,color:hazards[key]?"#7a4f00":"#444"}}>{label}</span>
+                      <span style={{fontSize:14,fontWeight:hazards[key]?700:400,color:hazards[key]?"#7a4f00":"#444"}}>{label}</span>
                     </button>
                     {hazards[key] && (
-                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      <div style={{display:"flex",flexDirection:"column",gap:7}}>
                         {dist && <div>
                           <div style={S.subLabel}>DISTANCE</div>
                           <input style={{...S.input,borderColor:"#f0c070",background:"#fffaf4"}}
@@ -464,7 +636,7 @@
             </div>
 
             {/* Photos */}
-            <div style={{marginBottom:20}}>
+            <div style={{marginBottom:18}}>
               <label style={S.label}>Photos ({photos.length}/20)</label>
               <button type="button" style={S.btnPhoto} onClick={()=>fileRef.current?.click()}>📷 Add Photos</button>
               <input ref={fileRef} type="file" accept="image/*" multiple capture="environment"
@@ -483,26 +655,27 @@
 
             {submitError && <div style={S.errorBox}>{submitError}</div>}
 
-            {/* Submit to server — only if token present */}
-            {TOKEN && (
-              <>
-                <button type="submit" style={S.btnSubmit} disabled={submitting}>
-                  {submitting?"Submitting…":"Submit Field Data"}
-                </button>
-                <div style={S.divider}>
-                  <div style={{flex:1,height:1,background:"#e5e7eb"}} />
-                  <span style={{color:"#aaa",fontSize:13}}>or</span>
-                  <div style={{flex:1,height:1,background:"#e5e7eb"}} />
-                </div>
-              </>
+            {isOnline ? (
+              <button type="submit" style={S.btnSubmit} disabled={submitting}>
+                {submitting?"Submitting…":"Submit Field Data"}
+              </button>
+            ) : (
+              <button type="submit" style={S.btnOffline} disabled={submitting}>
+                {submitting?"Saving…":"💾 Save Offline"}
+              </button>
             )}
+
+            <div style={S.divider}>
+              <div style={{flex:1,height:1,background:"#e5e7eb"}} />
+              <span style={{color:"#aaa",fontSize:13}}>or</span>
+              <div style={{flex:1,height:1,background:"#e5e7eb"}} />
+            </div>
 
             <button type="button" style={S.btnOutline} onClick={handleShareFile}>
               📤 Share / Save as File
             </button>
             <p style={S.hint}>
               Saves data as a <strong>.json</strong> file — share via WhatsApp, email, etc.
-              Office staff can import it from the Field Data section.
             </p>
 
           </form>
@@ -511,6 +684,12 @@
     }
 
     ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+
+  <script>
+    // Set the Railway API base URL here — injected at build/deploy time
+    // This allows the short-link resolver to know where the backend is
+    window.FIELD_API_BASE = "https://valuation-app-production-fff1.up.railway.app";
   </script>
 </body>
 </html>

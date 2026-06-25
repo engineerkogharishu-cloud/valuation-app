@@ -236,6 +236,23 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_fs_company ON field_submissions(company_code);
     CREATE INDEX IF NOT EXISTS idx_fs_status  ON field_submissions(status);
 
+    CREATE TABLE IF NOT EXISTS field_links (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_code TEXT    NOT NULL,
+      short_code   TEXT    NOT NULL UNIQUE,
+      label        TEXT    NOT NULL DEFAULT '',
+      link_type    TEXT    NOT NULL DEFAULT 'permanent' CHECK(link_type IN ('permanent','temporary')),
+      expires_at   DATETIME,
+      max_uses     INTEGER,
+      use_count    INTEGER NOT NULL DEFAULT 0,
+      active       INTEGER NOT NULL DEFAULT 1,
+      created_by   TEXT    NOT NULL DEFAULT '',
+      created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_fl_company ON field_links(company_code);
+    CREATE INDEX IF NOT EXISTS idx_fl_code    ON field_links(short_code);
+
     CREATE TABLE IF NOT EXISTS credit_transactions (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       company_code   TEXT    NOT NULL,
@@ -335,6 +352,22 @@ async function initDb() {
     "ALTER TABLE companies ADD COLUMN bill_prefix TEXT DEFAULT 'BILL'",
     // Payment methods (bank accounts with QR for bill)
     "ALTER TABLE companies ADD COLUMN payment_methods TEXT DEFAULT '[]'",
+    // Field links (short codes for mobile data collection)
+    `CREATE TABLE IF NOT EXISTS field_links (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_code TEXT    NOT NULL,
+      short_code   TEXT    NOT NULL UNIQUE,
+      label        TEXT    NOT NULL DEFAULT '',
+      link_type    TEXT    NOT NULL DEFAULT 'permanent' CHECK(link_type IN ('permanent','temporary')),
+      expires_at   DATETIME,
+      max_uses     INTEGER,
+      use_count    INTEGER NOT NULL DEFAULT 0,
+      active       INTEGER NOT NULL DEFAULT 1,
+      created_by   TEXT    NOT NULL DEFAULT '',
+      created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_fl_company ON field_links(company_code)",
+    "CREATE INDEX IF NOT EXISTS idx_fl_code    ON field_links(short_code)",
   ];
   for (const sql of migrations) {
     try { await db.execute(sql); } catch (_) {}
@@ -2511,6 +2544,106 @@ app.put("/api/reports/reassign-orphans", auth(["super_user"]), async (req, res) 
 // ── Field Data Collection ─────────────────────────────────────────────────────
 
 // Generate a 7-day submission token (admin only)
+// ── Field Link helpers ────────────────────────────────────────────────────────
+const SHORT_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function generateShortCode() {
+  let code = "";
+  for (let i = 0; i < 6; i++) code += SHORT_CODE_CHARS[Math.floor(Math.random() * SHORT_CODE_CHARS.length)];
+  return code;
+}
+
+// Admin: create a collection link (permanent or temporary)
+app.post("/api/field/links", auth(["admin"]), async (req, res) => {
+  try {
+    const { label = "", link_type = "permanent", expires_days, max_uses } = req.body || {};
+    if (!["permanent", "temporary"].includes(link_type))
+      return res.status(400).json({ error: "link_type must be permanent or temporary" });
+
+    let short_code, attempts = 0;
+    do {
+      short_code = generateShortCode();
+      attempts++;
+      if (attempts > 20) return res.status(500).json({ error: "Could not generate unique code" });
+    } while (await dbGet("SELECT id FROM field_links WHERE short_code=?", [short_code]));
+
+    const expires_at = (link_type === "temporary" && expires_days)
+      ? new Date(Date.now() + expires_days * 86400000).toISOString()
+      : null;
+
+    const result = await dbRun(
+      `INSERT INTO field_links (company_code, short_code, label, link_type, expires_at, max_uses, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.companyCode, short_code, String(label).substring(0, 100),
+       link_type, expires_at, max_uses ? Number(max_uses) : null, req.user.username]
+    );
+    const link = await dbGet("SELECT * FROM field_links WHERE id=?", [result.lastInsertRowid]);
+    res.status(201).json(link);
+  } catch (err) { handleError(res, err, "POST /api/field/links"); }
+});
+
+// Admin: list all links for this company
+app.get("/api/field/links", auth(["admin"]), async (req, res) => {
+  try {
+    const links = await dbAll(
+      "SELECT * FROM field_links WHERE company_code=? ORDER BY created_at DESC",
+      [req.user.companyCode]
+    );
+    res.json(links);
+  } catch (err) { handleError(res, err, "GET /api/field/links"); }
+});
+
+// Admin: deactivate/delete a link
+app.delete("/api/field/links/:id", auth(["admin"]), async (req, res) => {
+  try {
+    await dbRun(
+      "UPDATE field_links SET active=0 WHERE id=? AND company_code=?",
+      [req.params.id, req.user.companyCode]
+    );
+    res.json({ message: "Link deactivated" });
+  } catch (err) { handleError(res, err, "DELETE /api/field/links/:id"); }
+});
+
+// Public: resolve short code → return company info + API base URL
+app.get("/api/field/link/:code", async (req, res) => {
+  try {
+    const link = await dbGet(
+      "SELECT * FROM field_links WHERE short_code=? AND active=1",
+      [req.params.code.toUpperCase()]
+    );
+    if (!link) return res.status(404).json({ error: "Link not found or deactivated" });
+
+    if (link.expires_at && new Date(link.expires_at) < new Date())
+      return res.status(410).json({ error: "This link has expired" });
+
+    if (link.max_uses && link.use_count >= link.max_uses)
+      return res.status(410).json({ error: "This link has reached its maximum uses" });
+
+    const company = await dbGet(
+      "SELECT company_name, custom_banks FROM companies WHERE company_code=?",
+      [link.company_code]
+    );
+    let banks = [];
+    try { banks = JSON.parse(company?.custom_banks || "[]"); } catch (_) {}
+
+    // Increment use count
+    await dbRun("UPDATE field_links SET use_count=use_count+1 WHERE id=?", [link.id]);
+
+    const apiUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+      : (process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`);
+
+    res.json({
+      companyCode: link.company_code,
+      companyName: company?.company_name || "",
+      banks,
+      short_code: link.short_code,
+      link_type: link.link_type,
+      expires_at: link.expires_at,
+      apiUrl,
+    });
+  } catch (err) { handleError(res, err, "GET /api/field/link/:code"); }
+});
+
 app.post("/api/field/token", auth(["admin"]), async (req, res) => {
   try {
     const company = await dbGet("SELECT company_name FROM companies WHERE company_code=?", [req.user.companyCode]);
@@ -2544,18 +2677,37 @@ app.get("/api/field/company-info", async (req, res) => {
   }
 });
 
-// Public: submit field data (token in body)
+// Public: submit field data — accepts short_code OR legacy JWT token
 app.post("/api/field/submit", express.json({ limit: "20mb" }), async (req, res) => {
   try {
-    const { token, data, photos } = req.body;
-    if (!token) return res.status(400).json({ error: "token required" });
-    let decoded;
-    try { decoded = jwt.verify(token, JWT_SECRET); } catch {
-      return res.status(401).json({ error: "Invalid or expired link." });
-    }
-    if (decoded.type !== "field_submit") return res.status(401).json({ error: "Invalid token type" });
+    const { token, short_code, data, photos } = req.body;
+    let companyCode;
 
-    const sanitized      = deepSanitize(data || {});
+    if (short_code) {
+      // New short-code based submission
+      const link = await dbGet(
+        "SELECT * FROM field_links WHERE short_code=? AND active=1",
+        [String(short_code).toUpperCase()]
+      );
+      if (!link) return res.status(401).json({ error: "Invalid or deactivated link." });
+      if (link.expires_at && new Date(link.expires_at) < new Date())
+        return res.status(410).json({ error: "This link has expired." });
+      if (link.max_uses && link.use_count >= link.max_uses)
+        return res.status(410).json({ error: "This link has reached its maximum uses." });
+      companyCode = link.company_code;
+    } else if (token) {
+      // Legacy JWT token submission
+      let decoded;
+      try { decoded = jwt.verify(token, JWT_SECRET); } catch {
+        return res.status(401).json({ error: "Invalid or expired link." });
+      }
+      if (decoded.type !== "field_submit") return res.status(401).json({ error: "Invalid token type" });
+      companyCode = decoded.companyCode;
+    } else {
+      return res.status(400).json({ error: "short_code or token required" });
+    }
+
+    const sanitized       = deepSanitize(data || {});
     const sanitizedPhotos = Array.isArray(photos)
       ? photos.filter((p) => typeof p === "string" && VALID_IMG_PREFIX.test(p)).slice(0, 20)
       : [];
@@ -2563,7 +2715,7 @@ app.post("/api/field/submit", express.json({ limit: "20mb" }), async (req, res) 
     await dbRun(
       `INSERT INTO field_submissions (company_code, submitter_name, data_json, photos_json)
        VALUES (?, ?, ?, ?)`,
-      [decoded.companyCode,
+      [companyCode,
        String(sanitized.submitterName || "").substring(0, 100),
        JSON.stringify(sanitized),
        JSON.stringify(sanitizedPhotos)]
