@@ -2791,9 +2791,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                             <td className="calc-cell">{ca.toFixed(2)}</td>
                             <td className="calc-cell">{r}-{a}-{pp}-{d}</td>
                             <td className="calc-cell">{sqmToAana(ca).toFixed(4)}</td>
-                            <td className="calc-cell" style={{color:"#1565c0",fontWeight:700}}>
-                              {gRate ? gRate.toLocaleString("en-NP",{minimumFractionDigits:2,maximumFractionDigits:2}) : <span style={{color:"var(--text-3)",fontStyle:"italic",fontWeight:400}}>from Sec. 6</span>}
-                            </td>
+                            <td className="calc-cell" style={{color:"var(--text-3)",fontStyle:"italic",fontWeight:400}}>—</td>
                             <td colSpan={2} style={{textAlign:"center",fontStyle:"italic",color:"var(--text-3)",fontSize:"11px"}}>Multiple rates</td>
                           </tr>
                           );

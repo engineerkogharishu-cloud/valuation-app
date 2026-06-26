@@ -302,7 +302,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
       const dR=Math.floor(fR*_distressMult2/100)*100;
       totalLandComm+=cR; totalLandFMV2+=fR; totalLandGov+=gR;
       landRateRows+=`<tr style="background:#f0ece6;font-weight:bold"><td>${esc(p.plotNo)} — Sub-total</td><td>${considered.toFixed(3)}</td><td>${_ud(p,considered)}</td>
-          <td style="color:#1565c0">${spGovRate?spGovRate.toLocaleString("en-NP",{minimumFractionDigits:2,maximumFractionDigits:2}):"—"}</td>
+          <td style="color:#555;font-style:italic">—</td>
           <td colspan="2" style="text-align:center;font-style:italic;color:#888">Multiple rates</td></tr>`;
       landValueRows+=`<tr style="background:#f0ece6;font-weight:bold"><td>${esc(p.plotNo)} — Sub-total</td><td>${_ud(p,considered)}</td>
           <td style="color:#1565c0">NPR ${gVal.toLocaleString("en-NP",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>

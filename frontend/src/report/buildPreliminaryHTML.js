@@ -296,7 +296,7 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
         <td>${considered.toFixed(3)}</td>
         <td>${_nativeStr(p, considered)}</td>
         <td>${_ud(p, considered)}</td>
-        <td style="color:#1565c0">${spGovRate ? spGovRate.toLocaleString("en-NP", { minimumFractionDigits: 2 }) : "—"}</td>
+        <td style="color:#555;font-style:italic">—</td>
         <td colspan="2" style="text-align:center;font-style:italic">Multiple rates</td>
       </tr>`;
       landValueRows += `<tr class="subtotal-row">
