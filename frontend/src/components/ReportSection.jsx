@@ -261,10 +261,22 @@ export default function ReportSection({
   const [showFieldDialog, setShowFieldDialog] = React.useState(false);
   const [paymentMethods, setPaymentMethods] = React.useState([]);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = React.useState("");
-  const [feeTiers, setFeeTiers] = React.useState(DEFAULT_FEE_TIERS);
+  // feeTiersMap: { [bankName]: tier[] } from company settings
+  const [feeTiersMap, setFeeTiersMap] = React.useState({});
   const { requestPrint, ConfirmDialog, creditData } = usePrintCredit(reportId);
 
-  const valuationFee = calcValuationFeeWithTiers(finalFMV || 0, feeTiers);
+  // Resolve which tiers apply: bank-specific → "Default" → built-in NRB schedule
+  const currentBank = collectState().bank || "";
+  const resolvedTiers = React.useMemo(() => {
+    const normalize = (list) => list.map(t => ({ ...t, upto: t.upto === null ? Infinity : t.upto }));
+    if (feeTiersMap[currentBank] && feeTiersMap[currentBank].length > 0)
+      return normalize(feeTiersMap[currentBank]);
+    if (feeTiersMap["Default"] && feeTiersMap["Default"].length > 0)
+      return normalize(feeTiersMap["Default"]);
+    return DEFAULT_FEE_TIERS;
+  }, [feeTiersMap, currentBank]);
+
+  const valuationFee = calcValuationFeeWithTiers(finalFMV || 0, resolvedTiers);
 
   React.useEffect(() => {
     api.getCompanyPaymentMethods().then(d => {
@@ -273,8 +285,7 @@ export default function ReportSection({
       if (methods.length && !selectedPaymentMethodId) setSelectedPaymentMethodId(methods[0].id);
     }).catch(() => {});
     api.getCompanyFeeTiers().then(d => {
-      const tiers = d.fee_tiers || [];
-      if (tiers.length > 0) setFeeTiers(tiers.map(t => ({ ...t, upto: t.upto === null ? Infinity : t.upto })));
+      setFeeTiersMap(d.fee_tiers || {});
     }).catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

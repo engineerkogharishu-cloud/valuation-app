@@ -1061,8 +1061,12 @@ app.get("/api/company/fee-tiers", auth(), async (req, res) => {
   try {
     const company = await dbGet("SELECT fee_tiers FROM companies WHERE company_code=?", [req.user.companyCode]);
     if (!company) return res.status(404).json({ error: "Company not found" });
-    let tiers = [];
-    try { tiers = JSON.parse(company.fee_tiers || "[]"); } catch (_) {}
+    let tiers = {};
+    try {
+      const parsed = JSON.parse(company.fee_tiers || "{}");
+      // Migrate old array format to empty object
+      tiers = Array.isArray(parsed) ? {} : (parsed && typeof parsed === "object" ? parsed : {});
+    } catch (_) {}
     res.json({ fee_tiers: tiers });
   } catch (err) {
     handleError(res, err, "GET /api/company/fee-tiers");
@@ -1072,13 +1076,20 @@ app.get("/api/company/fee-tiers", auth(), async (req, res) => {
 app.put("/api/company/fee-tiers", auth(["admin", "super_user"]), async (req, res) => {
   try {
     const { fee_tiers } = req.body;
-    if (!Array.isArray(fee_tiers)) return res.status(400).json({ error: "fee_tiers must be an array" });
-    const clean = fee_tiers.map(t => ({
-      label:    String(t.label    || "").trim(),
-      upto:     t.upto === null || t.upto === "" ? null : Number(t.upto),
-      base:     Number(t.base     || 0),
-      rate:     Number(t.rate     || 0),
+    // fee_tiers is an object: { [bankName]: tier[] }
+    if (typeof fee_tiers !== "object" || Array.isArray(fee_tiers) || fee_tiers === null)
+      return res.status(400).json({ error: "fee_tiers must be an object keyed by bank name" });
+    const cleanTierList = (list) => (Array.isArray(list) ? list : []).map(t => ({
+      label: String(t.label || "").trim(),
+      upto:  t.upto === null || t.upto === "" ? null : Number(t.upto),
+      base:  Number(t.base  || 0),
+      rate:  Number(t.rate  || 0),
     })).filter(t => t.label);
+    const clean = {};
+    for (const [bank, list] of Object.entries(fee_tiers)) {
+      const key = String(bank).trim();
+      if (key) clean[key] = cleanTierList(list);
+    }
     await dbRun(
       "UPDATE companies SET fee_tiers=?, updated_at=CURRENT_TIMESTAMP WHERE company_code=?",
       [JSON.stringify(clean), req.user.companyCode]
