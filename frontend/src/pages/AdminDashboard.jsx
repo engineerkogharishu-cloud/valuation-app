@@ -466,6 +466,8 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
   const [billingStats, setBillingStats] = useState(null);
   const [billingLoading, setBillingLoading] = useState(false);
   const [storageStats, setStorageStats] = useState(null);
+  const [storageError, setStorageError] = useState(null);
+  const [storageLoading, setStorageLoading] = useState(true);
 
   const [rejectedSubmissions, setRejectedSubmissions] = useState([]);
   const [rejectedLoading, setRejectedLoading] = useState(false);
@@ -540,7 +542,9 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
   }, []);
 
   useEffect(() => {
-    api.getStorageStats().then(setStorageStats).catch(() => {});
+    api.getStorageStats()
+      .then(d => { setStorageStats(d); setStorageLoading(false); })
+      .catch(e => { setStorageError(e.message || "Failed to load"); setStorageLoading(false); });
   }, []);
 
   useEffect(() => { loadUsers(); loadProfile(); loadBanks(); loadValuators(); loadPaymentMethods(); loadFeeTiers(); loadCredits(); loadBillingStats(); loadRejectedSubmissions(); }, [loadUsers, loadProfile, loadBanks, loadValuators, loadPaymentMethods, loadFeeTiers, loadCredits, loadBillingStats, loadRejectedSubmissions]);
@@ -1698,9 +1702,20 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
         ══════════════════════════════════════════ */}
         {tab === "storage" && (
           <div>
-            {storageStats
+            {storageLoading
+              ? <div style={{ textAlign: "center", padding: 40, color: "#8a97aa" }}>Loading storage data…</div>
+              : storageError
+              ? <div style={{ textAlign: "center", padding: 40 }}>
+                  <div style={{ color: "#e74c3c", fontWeight: 700, marginBottom: 8 }}>❌ Failed to load storage data</div>
+                  <div style={{ color: "#8a97aa", fontSize: 13, marginBottom: 16 }}>{storageError}</div>
+                  <button onClick={() => { setStorageLoading(true); setStorageError(null); api.getStorageStats().then(d => { setStorageStats(d); setStorageLoading(false); }).catch(e => { setStorageError(e.message); setStorageLoading(false); }); }}
+                    style={{ padding: "8px 20px", background: "#0f1f3d", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>
+                    ↺ Retry
+                  </button>
+                </div>
+              : storageStats
               ? <StorageCard stats={storageStats} />
-              : <div style={{ textAlign: "center", padding: 40, color: "#8a97aa" }}>Loading storage data…</div>}
+              : null}
           </div>
         )}
 
