@@ -730,6 +730,91 @@ function RateMapAccessAdmin({ companies }) {
   );
 }
 
+// ── Storage helpers ───────────────────────────────────────────
+function fmtBytes(b) {
+  if (b >= 1073741824) return (b / 1073741824).toFixed(2) + " GB";
+  if (b >= 1048576)    return (b / 1048576).toFixed(2) + " MB";
+  if (b >= 1024)       return (b / 1024).toFixed(1) + " KB";
+  return b + " B";
+}
+
+function MiniBar({ pct, color }) {
+  return (
+    <div style={{ background: "#e2e8f0", borderRadius: 4, height: 6, width: "100%", overflow: "hidden" }}>
+      <div style={{ width: pct + "%", height: "100%", background: color, borderRadius: 4 }} />
+    </div>
+  );
+}
+
+function StoragePanel() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getAdminStorageStats().then(setData).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading storage data…</div>;
+  if (!data) return <div style={{ padding: 40, textAlign: "center", color: C.danger }}>Failed to load storage data.</div>;
+
+  const grand = data.grand_total || 0;
+  const barColors = ["#1a73e8", "#8e44ad", "#27ae60", "#f39c12"];
+
+  return (
+    <div>
+      {/* Grand total */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 16, marginBottom: 24 }}>
+        {[
+          { label: "Total Storage Used", value: fmtBytes(grand), grad: GRAD.navy, icon: "💾" },
+          { label: "Total Companies",    value: data.companies?.length || 0, grad: GRAD.blue, icon: "🏢" },
+          { label: "Total Reports",      value: data.companies?.reduce((a, c) => a + c.report_count, 0) || 0, grad: GRAD.green, icon: "📋" },
+        ].map(({ label, value, grad, icon }) => (
+          <div key={label} style={{ background: grad, borderRadius: 12, padding: "18px 20px", color: "#fff" }}>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 700, opacity: 0.8, textTransform: "uppercase" }}>{icon} {label}</p>
+            <p style={{ margin: "8px 0 0", fontSize: 26, fontWeight: 900, lineHeight: 1 }}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Per-company table */}
+      <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+        <div style={{ padding: "14px 22px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 14, color: C.navy }}>
+          💾 Storage by Company
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                {["Company", "Reports", "Total Used", "Reports", "Versions", "Letterhead", "Field", "Usage Bar"].map(h => (
+                  <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.companies.map((co, i) => {
+                const pct = grand > 0 ? Math.min(100, (co.total / grand) * 100) : 0;
+                const bd = co.breakdown || {};
+                return (
+                  <tr key={co.company_code} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? "#fff" : "#fafbfd" }}>
+                    <td style={{ padding: "10px 14px", fontWeight: 700, color: C.navy }}>{co.company_name}<br/><span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>{co.company_code}</span></td>
+                    <td style={{ padding: "10px 14px", color: C.muted }}>{co.report_count}</td>
+                    <td style={{ padding: "10px 14px", fontWeight: 700, color: C.navy }}>{fmtBytes(co.total)}</td>
+                    <td style={{ padding: "10px 14px", color: "#1a73e8" }}>{fmtBytes(bd.reports || 0)}</td>
+                    <td style={{ padding: "10px 14px", color: "#8e44ad" }}>{fmtBytes(bd.versions || 0)}</td>
+                    <td style={{ padding: "10px 14px", color: "#27ae60" }}>{fmtBytes(bd.letterhead || 0)}</td>
+                    <td style={{ padding: "10px 14px", color: "#f39c12" }}>{fmtBytes(bd.field || 0)}</td>
+                    <td style={{ padding: "10px 14px", minWidth: 120 }}><MiniBar pct={pct} color="#1a73e8" /><span style={{ fontSize: 10, color: C.muted }}>{pct.toFixed(1)}%</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Mass / Broadcast Email ────────────────────────────────────
 function BroadcastEmail({ companies }) {
   const [subject, setSubject]   = useState("");
@@ -1205,6 +1290,7 @@ export default function SuperUserDashboard({ user, onLogout }) {
     ["registrations", "📝", "Registrations", pendingRegCount],
     ["feedback",      "💬", "Feedback"],
     ["broadcast",     "📧", "Mass Email"],
+    ["storage",       "💾", "Storage"],
     ["map",           "🗺",  "Map"],
   ];
 
@@ -1704,6 +1790,9 @@ export default function SuperUserDashboard({ user, onLogout }) {
 
         {/* ══════════════ Mass Email Tab ══════════════ */}
         {tab === "broadcast" && <BroadcastEmail companies={companies} />}
+
+        {/* ══════════════ Storage Tab ══════════════ */}
+        {tab === "storage" && <StoragePanel />}
 
         {/* ══════════════ Map Tab ══════════════ */}
         {tab === "map" && (

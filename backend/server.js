@@ -2617,6 +2617,62 @@ app.get("/api/stats/billing", auth(["super_user", "admin"]), async (req, res) =>
   }
 });
 
+// ── Storage Stats ─────────────────────────────────────────────────────────────
+
+// Company admin — own storage
+app.get("/api/stats/storage", auth(), async (req, res) => {
+  try {
+    const cc = req.user.companyCode;
+    const [reports, versions, company, fieldSubs] = await Promise.all([
+      dbAll("SELECT length(state_json) as sz FROM reports WHERE company_code=?", [cc]),
+      dbAll("SELECT length(state_json) as sz FROM report_versions WHERE company_code=?", [cc]),
+      dbGet("SELECT length(letterhead_png) as lh FROM companies WHERE company_code=?", [cc]),
+      dbAll("SELECT length(photos_json) as sz FROM field_submissions WHERE company_code=?", [cc]),
+    ]);
+    const sum = (rows) => rows.reduce((a, r) => a + (r.sz || 0), 0);
+    const reportsBytes   = sum(reports);
+    const versionsBytes  = sum(versions);
+    const letterheadBytes = company?.lh || 0;
+    const fieldBytes     = sum(fieldSubs);
+    const totalBytes     = reportsBytes + versionsBytes + letterheadBytes + fieldBytes;
+    res.json({
+      total: totalBytes,
+      breakdown: {
+        reports:    reportsBytes,
+        versions:   versionsBytes,
+        letterhead: letterheadBytes,
+        field:      fieldBytes,
+      },
+      report_count:  reports.length,
+      version_count: versions.length,
+    });
+  } catch (err) { handleError(res, err, "GET /api/stats/storage"); }
+});
+
+// Super admin — all companies storage
+app.get("/api/admin/stats/storage", auth(["super_user"]), async (req, res) => {
+  try {
+    const rows = await dbAll(`
+      SELECT c.company_code, c.company_name,
+        (SELECT COALESCE(SUM(length(state_json)),0) FROM reports       WHERE company_code=c.company_code) as report_bytes,
+        (SELECT COALESCE(SUM(length(state_json)),0) FROM report_versions WHERE company_code=c.company_code) as version_bytes,
+        COALESCE(length(c.letterhead_png),0) as letterhead_bytes,
+        (SELECT COALESCE(SUM(length(photos_json)),0) FROM field_submissions WHERE company_code=c.company_code) as field_bytes,
+        (SELECT COUNT(*) FROM reports WHERE company_code=c.company_code) as report_count
+      FROM companies c ORDER BY (report_bytes + version_bytes + letterhead_bytes + field_bytes) DESC
+    `);
+    const companies = rows.map(r => ({
+      company_code:  r.company_code,
+      company_name:  r.company_name,
+      total:         r.report_bytes + r.version_bytes + r.letterhead_bytes + r.field_bytes,
+      breakdown: { reports: r.report_bytes, versions: r.version_bytes, letterhead: r.letterhead_bytes, field: r.field_bytes },
+      report_count:  r.report_count,
+    }));
+    const grandTotal = companies.reduce((a, c) => a + c.total, 0);
+    res.json({ grand_total: grandTotal, companies });
+  } catch (err) { handleError(res, err, "GET /api/admin/stats/storage"); }
+});
+
 // ── Map Data (super_user only) ────────────────────────────────────────────────
 
 app.get("/api/map/data", auth(["super_user"]), async (req, res) => {

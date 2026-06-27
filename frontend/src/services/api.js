@@ -225,6 +225,10 @@ export const api = {
   getCreditHistory: (company_code) =>
     request(`/admin/credits/${company_code}/history`),
 
+  // Storage stats
+  getStorageStats: () => request("/stats/storage"),
+  getAdminStorageStats: () => request("/admin/stats/storage"),
+
   // Super Admin broadcast email
   broadcastEmail: (subject, html, target = "all") =>
     request("/admin/email/broadcast", { method: "POST", body: JSON.stringify({ subject, html, target }) }),

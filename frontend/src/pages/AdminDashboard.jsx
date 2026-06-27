@@ -271,6 +271,52 @@ function StatCard({ label, value, gradient, icon, onClick }) {
   );
 }
 
+// ── Shared Storage Card ───────────────────────────────────────
+function fmtBytes(b) {
+  if (b >= 1073741824) return (b / 1073741824).toFixed(2) + " GB";
+  if (b >= 1048576)    return (b / 1048576).toFixed(2) + " MB";
+  if (b >= 1024)       return (b / 1024).toFixed(1) + " KB";
+  return b + " B";
+}
+
+function StorageBar({ label, bytes, total, color }) {
+  const pct = total > 0 ? Math.min(100, (bytes / total) * 100) : 0;
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+        <span style={{ color: "#4a5568", fontWeight: 600 }}>{label}</span>
+        <span style={{ color: "#718096" }}>{fmtBytes(bytes)} ({pct.toFixed(1)}%)</span>
+      </div>
+      <div style={{ background: "#e2e8f0", borderRadius: 6, height: 8, overflow: "hidden" }}>
+        <div style={{ width: pct + "%", height: "100%", background: color, borderRadius: 6, transition: "width 0.5s" }} />
+      </div>
+    </div>
+  );
+}
+
+function StorageCard({ stats }) {
+  const total = stats.total || 0;
+  const bd = stats.breakdown || {};
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #dde1e7", padding: "20px 24px", marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#0f1f3d" }}>💾 Storage Usage</h3>
+          <p style={{ margin: "3px 0 0", fontSize: 12, color: "#8a97aa" }}>{stats.report_count} reports · {stats.version_count} saved versions</p>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 24, fontWeight: 900, color: "#0f1f3d" }}>{fmtBytes(total)}</div>
+          <div style={{ fontSize: 11, color: "#8a97aa" }}>Total used</div>
+        </div>
+      </div>
+      <StorageBar label="Reports (with photos)" bytes={bd.reports || 0}    total={total} color="#1a73e8" />
+      <StorageBar label="Version History"        bytes={bd.versions || 0}   total={total} color="#8e44ad" />
+      <StorageBar label="Letterhead Image"       bytes={bd.letterhead || 0} total={total} color="#27ae60" />
+      <StorageBar label="Field Submissions"      bytes={bd.field || 0}      total={total} color="#f39c12" />
+    </div>
+  );
+}
+
 export default function AdminDashboard({ user, onLogout, onOpen }) {
   const [tab, setTab] = useState("users");
   const [users, setUsers] = useState([]);
@@ -337,6 +383,7 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
   const [creditModal, setCreditModal] = useState(false);
   const [billingStats, setBillingStats] = useState(null);
   const [billingLoading, setBillingLoading] = useState(false);
+  const [storageStats, setStorageStats] = useState(null);
 
   const [rejectedSubmissions, setRejectedSubmissions] = useState([]);
   const [rejectedLoading, setRejectedLoading] = useState(false);
@@ -408,6 +455,10 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
     try { setBillingStats(await api.getBillingStats()); }
     catch (e) { console.error(e); }
     finally { setBillingLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    api.getStorageStats().then(setStorageStats).catch(() => {});
   }, []);
 
   useEffect(() => { loadUsers(); loadProfile(); loadBanks(); loadValuators(); loadPaymentMethods(); loadFeeTiers(); loadCredits(); loadBillingStats(); loadRejectedSubmissions(); }, [loadUsers, loadProfile, loadBanks, loadValuators, loadPaymentMethods, loadFeeTiers, loadCredits, loadBillingStats, loadRejectedSubmissions]);
@@ -1502,6 +1553,9 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                 </div>
               ))}
             </div>
+
+            {/* Storage card */}
+            {storageStats && <StorageCard stats={storageStats} />}
 
             {/* Per-report table */}
             <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden" }}>
