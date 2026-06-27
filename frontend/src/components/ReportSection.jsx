@@ -53,20 +53,30 @@ function buildDefaultDocs(clients, owners, hasBuilding, properties) {
   let id = 0;
   const mk = (label, group) => ({ id: id++, label, available: false, group, custom: false });
 
-  // Per-client citizenships
+  // Collect all person names from clients and owners; deduplicate by name.
+  // If the same name appears in both client and owner lists, show one combined entry.
+  const ownerNames = new Set(
+    (owners || []).filter(o => o.showPerson && o.person?.name?.trim()).map(o => o.person.name.trim())
+  );
+  const seenNames = new Set();
+
   (clients || []).forEach((cl, i) => {
-    if (cl.showPerson) {
-      const name = cl.person?.name?.trim() || `Client ${i + 1}`;
+    if (!cl.showPerson) return;
+    const name = cl.person?.name?.trim() || `Client ${i + 1}`;
+    seenNames.add(name);
+    if (ownerNames.has(name)) {
+      // Same person is both client and owner — one entry suffices
+      docs.push(mk(`Citizenship — ${name} (Client & Owner)`, "client"));
+    } else {
       docs.push(mk(`Citizenship of Client — ${name}`, "client"));
     }
   });
 
-  // Per-owner citizenships
   (owners || []).forEach((ow, i) => {
-    if (ow.showPerson) {
-      const name = ow.person?.name?.trim() || `Owner ${i + 1}`;
-      docs.push(mk(`Citizenship of Owner — ${name}`, "owner"));
-    }
+    if (!ow.showPerson) return;
+    const name = ow.person?.name?.trim() || `Owner ${i + 1}`;
+    if (seenNames.has(name)) return; // already added via client loop
+    docs.push(mk(`Citizenship of Owner — ${name}`, "owner"));
   });
 
   // Always-present land docs
