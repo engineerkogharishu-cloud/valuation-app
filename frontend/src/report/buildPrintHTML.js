@@ -1898,13 +1898,7 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
     if (fmv <= 0) return { valFee: 0, valFeeBreakdown: ["FMV is 0 — no fee applicable."] };
     const floors = tiers.map((_, i) => i === 0 ? 0 : (tiers[i-1].upto == null ? Infinity : Number(tiers[i-1].upto)));
     const steps = [`FMV = NPR ${fmt(fmv)}`];
-    if (fmv <= Number(tiers[0].upto)) {
-      const fee = Number(tiers[0].base) || 0;
-      steps.push(`Slab: Up to NPR ${fmt(Number(tiers[0].upto))}${tiers[0].label ? " ("+tiers[0].label+")" : ""}`);
-      steps.push(`Fee = NPR ${fmt(fee)} (flat base fee)`);
-      return { valFee: fee, valFeeBreakdown: steps };
-    }
-    for (let i = 1; i < tiers.length; i++) {
+    for (let i = 0; i < tiers.length; i++) {
       const ceil = tiers[i].upto == null ? Infinity : Number(tiers[i].upto);
       if (fmv <= ceil) {
         const base = Number(tiers[i].base);

@@ -28,9 +28,8 @@ function getTierFloors(tiers) {
 export function calcValuationFeeWithTiers(fmv, tiers) {
   if (!fmv || fmv <= 0 || !tiers || tiers.length === 0) return 0;
   const floors = getTierFloors(tiers);
-  // First tier is flat minimum
-  if (fmv <= tiers[0].upto) return tiers[0].base || 0;
-  for (let i = 1; i < tiers.length; i++) {
+  // All tiers: fee = base + (fmv - floor) × rate
+  for (let i = 0; i < tiers.length; i++) {
     const ceiling = tiers[i].upto === null ? Infinity : tiers[i].upto;
     if (fmv <= ceiling) {
       return Math.round(tiers[i].base + (fmv - floors[i]) * tiers[i].rate);
