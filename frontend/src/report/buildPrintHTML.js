@@ -1887,7 +1887,7 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
         } else {
           steps.push(`Slab: NPR ${fmt(lo)} – ${hi === Infinity ? "above" : "NPR "+fmt(hi)}`);
           steps.push(`Base fee = NPR ${fmt(base)}`);
-          steps.push(`Incremental: (${fmt(fmv)} − ${fmt(lo)}) × ${(rate*100).toFixed(4)}% = NPR ${fmt(inc)}`);
+          steps.push(`Incremental: (${fmt(fmv)} − ${fmt(lo)}) × ${rate.toFixed(4)} = NPR ${fmt(inc)}`);
           steps.push(`Total fee = ${fmt(base)} + ${fmt(inc)} = NPR ${fmt(fee)}`);
         }
       }
@@ -1914,7 +1914,7 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
         const fee  = Math.round(base + diff * rate);
         steps.push(`Slab: NPR ${fmt(floors[i])} – ${ceil === Infinity ? "above" : "NPR "+fmt(ceil)}${tiers[i].label ? " ("+tiers[i].label+")" : ""}`);
         steps.push(`Base fee = NPR ${fmt(base)}`);
-        steps.push(`Incremental: (${fmt(fmv)} − ${fmt(floors[i])}) × ${(rate*100).toFixed(4)}% = NPR ${fmt(inc)}`);
+        steps.push(`Incremental: (${fmt(fmv)} − ${fmt(floors[i])}) × ${rate.toFixed(4)} = NPR ${fmt(inc)}`);
         steps.push(`Total fee = ${fmt(base)} + ${fmt(inc)} = NPR ${fmt(fee)}`);
         return { valFee: fee, valFeeBreakdown: steps };
       }
@@ -1927,7 +1927,7 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
     const fee  = Math.round(base + diff * rate);
     steps.push(`Slab: NPR ${fmt(floors[floors.length-1])} and above${last.label ? " ("+last.label+")" : ""}`);
     steps.push(`Base fee = NPR ${fmt(base)}`);
-    steps.push(`Incremental: (${fmt(fmv)} − ${fmt(floors[floors.length-1])}) × ${(rate*100).toFixed(4)}% = NPR ${fmt(inc)}`);
+    steps.push(`Incremental: (${fmt(fmv)} − ${fmt(floors[floors.length-1])}) × ${rate.toFixed(4)} = NPR ${fmt(inc)}`);
     steps.push(`Total fee = ${fmt(base)} + ${fmt(inc)} = NPR ${fmt(fee)}`);
     return { valFee: fee, valFeeBreakdown: steps };
   })();
