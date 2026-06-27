@@ -2627,7 +2627,7 @@ app.get("/api/stats/storage", auth(), async (req, res) => {
       dbAll(`SELECT id, filename, created_at, updated_at,
                length(state_json) as report_bytes
              FROM reports WHERE company_code=? ORDER BY length(state_json) DESC`, [cc]),
-      dbAll(`SELECT report_id, length(state_json) as sz FROM report_versions WHERE company_code=?`, [cc]),
+      dbAll(`SELECT rv.report_id, length(rv.state_json) as sz FROM report_versions rv JOIN reports r ON r.id=rv.report_id WHERE r.company_code=?`, [cc]),
       dbGet("SELECT length(letterhead_png) as lh FROM companies WHERE company_code=?", [cc]),
       dbAll(`SELECT id, submitter_name, created_at, length(photos_json) as sz FROM field_submissions WHERE company_code=?`, [cc]),
     ]);
@@ -2672,7 +2672,7 @@ app.get("/api/admin/stats/storage", auth(["super_user"]), async (req, res) => {
     const rows = await dbAll(`
       SELECT c.company_code, c.company_name,
         (SELECT COALESCE(SUM(length(state_json)),0) FROM reports       WHERE company_code=c.company_code) as report_bytes,
-        (SELECT COALESCE(SUM(length(state_json)),0) FROM report_versions WHERE company_code=c.company_code) as version_bytes,
+        (SELECT COALESCE(SUM(length(rv.state_json)),0) FROM report_versions rv JOIN reports r ON r.id=rv.report_id WHERE r.company_code=c.company_code) as version_bytes,
         COALESCE(length(c.letterhead_png),0) as letterhead_bytes,
         (SELECT COALESCE(SUM(length(photos_json)),0) FROM field_submissions WHERE company_code=c.company_code) as field_bytes,
         (SELECT COUNT(*) FROM reports WHERE company_code=c.company_code) as report_count
