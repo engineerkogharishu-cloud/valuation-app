@@ -160,9 +160,8 @@ export default function MobileCollectPage({ token, shortCode }) {
 
   // ── Form state ────────────────────────────────────────────
   const [form, setForm] = useState({
-    submitterName: "", reportDate: todayISO(), visitDate: todayISO(),
-    bank: "", branch: "", clientName: "", clientCitizenshipNo: "", clientIssuedDate: "", clientIssuedBy: "",
-    ownerName: "", ownerCitizenshipNo: "", ownerIssuedDate: "", ownerIssuedBy: "",
+    submitterName: "", visitDate: todayISO(),
+    bank: "", branch: "", clientName: "", ownerName: "",
     location: "", addressLalpurja: "", lat: "", lng: "", googlePlusCode: "",
     landType: "", landCategory: "", ownershipType: "", faceDirection: "",
     landMarketRate: "", buildingRate: "", notes: "",
@@ -187,8 +186,8 @@ export default function MobileCollectPage({ token, shortCode }) {
   const setRoadField = (i, k, v) => setRoads(r => r.map((row, idx) => idx === i ? { ...row, [k]: v } : row));
 
   // ── Building ──────────────────────────────────────────────
-  const [hasBuilding, setHasBuilding] = useState(null); // null=unset, true, false
-  const [building, setBuilding] = useState({ numFloors: "", yearOfConstruction: "", expectedLife: "60", structureType: "", foundationType: "", faceDirection: "", buildingPermit: "", totalAreaSqft: "", remarks: "" });
+  const [hasBuilding, setHasBuilding] = useState(null); // null=unset, "yes"|"yes_not_valuing"|"no"
+  const [building, setBuilding] = useState({ numFloors: "", structureType: "", foundationType: "", faceDirection: "", totalAreaSqft: "", remarks: "" });
   const setB = (k) => (e) => setBuilding(b => ({ ...b, [k]: e.target.value }));
 
   // ── Hazards ───────────────────────────────────────────────
@@ -242,7 +241,7 @@ export default function MobileCollectPage({ token, shortCode }) {
       traceSheets: Object.fromEntries(plotNos.filter(p => p.no.trim()).map(p => [p.no.trim(), p.traceSheet])),
       area,
       roads: roads.filter(r => r.type || r.width || r.side),
-      building: hasBuilding ? { ...building, present: true } : { present: false },
+      building: hasBuilding === "yes" ? { ...building, present: true } : { present: false, status: hasBuilding },
       hazards,
     },
     photos,
@@ -274,11 +273,11 @@ export default function MobileCollectPage({ token, shortCode }) {
   };
 
   const resetForm = () => {
-    setForm({ submitterName: "", reportDate: todayISO(), visitDate: todayISO(), bank: "", branch: "", clientName: "", clientCitizenshipNo: "", clientIssuedDate: "", clientIssuedBy: "", ownerName: "", ownerCitizenshipNo: "", ownerIssuedDate: "", ownerIssuedBy: "", location: "", addressLalpurja: "", lat: "", lng: "", googlePlusCode: "", landType: "", landCategory: "", ownershipType: "", faceDirection: "", landMarketRate: "", buildingRate: "", notes: "" });
+    setForm({ submitterName: "", visitDate: todayISO(), bank: "", branch: "", clientName: "", ownerName: "", location: "", addressLalpurja: "", lat: "", lng: "", googlePlusCode: "", landType: "", landCategory: "", ownershipType: "", faceDirection: "", landMarketRate: "", buildingRate: "", notes: "" });
     setPlotNos([{ no: "", traceSheet: "" }]);
     setArea({ r: "", a: "", p: "", d: "" });
     setRoads([{ ...EMPTY_ROAD }]);
-    setHasBuilding(null); setBuilding({ numFloors: "", yearOfConstruction: "", expectedLife: "60", structureType: "", foundationType: "", faceDirection: "", buildingPermit: "", totalAreaSqft: "", remarks: "" });
+    setHasBuilding(null); setBuilding({ numFloors: "", structureType: "", foundationType: "", faceDirection: "", totalAreaSqft: "", remarks: "" });
     setHazards(EMPTY_HAZARDS); setPhotos([]); setSubmitted(false); setSubmitError("");
   };
 
@@ -341,30 +340,19 @@ export default function MobileCollectPage({ token, shortCode }) {
             <FL label="Branch"><input style={S.input} value={form.branch} onChange={set("branch")} placeholder="Branch" /></FL>
             <FL label="Field Visit Date"><input style={S.input} type="date" value={form.visitDate} onChange={set("visitDate")} /></FL>
           </Row2>
-          <Row2>
-            <FL label="Report Date"><input style={S.input} type="date" value={form.reportDate} onChange={set("reportDate")} /></FL>
-            <FL label="Present Address / Location *"><input style={S.input} value={form.location} onChange={set("location")} placeholder="Ward, VDC/Municipality, District" /></FL>
-          </Row2>
+          <FL label="Present Address / Location *">
+            <input style={S.input} value={form.location} onChange={set("location")} placeholder="Ward, VDC/Municipality, District" />
+          </FL>
         </Section>
 
         {/* ── 2. CLIENT ── */}
         <Section icon="👤" title="Client / Borrower">
           <FL label="Full Name *"><input style={S.input} value={form.clientName} onChange={set("clientName")} placeholder="Full name of client" autoComplete="off" /></FL>
-          <Row2>
-            <FL label="Citizenship No."><input style={S.input} value={form.clientCitizenshipNo} onChange={set("clientCitizenshipNo")} placeholder="e.g. 12-34-5678" autoComplete="off" /></FL>
-            <FL label="Issued Date (BS)"><input style={S.input} value={form.clientIssuedDate} onChange={set("clientIssuedDate")} placeholder="e.g. 2075-05-10" autoComplete="off" /></FL>
-          </Row2>
-          <FL label="Issued By"><input style={S.input} value={form.clientIssuedBy} onChange={set("clientIssuedBy")} placeholder="District office / CDO office" autoComplete="off" /></FL>
         </Section>
 
         {/* ── 3. OWNER ── */}
         <Section icon="🏠" title="Property Owner">
           <FL label="Owner Name"><input style={S.input} value={form.ownerName} onChange={set("ownerName")} placeholder="If different from client" autoComplete="off" /></FL>
-          <Row2>
-            <FL label="Citizenship No."><input style={S.input} value={form.ownerCitizenshipNo} onChange={set("ownerCitizenshipNo")} placeholder="e.g. 12-34-5678" autoComplete="off" /></FL>
-            <FL label="Issued Date (BS)"><input style={S.input} value={form.ownerIssuedDate} onChange={set("ownerIssuedDate")} placeholder="e.g. 2075-05-10" autoComplete="off" /></FL>
-          </Row2>
-          <FL label="Issued By"><input style={S.input} value={form.ownerIssuedBy} onChange={set("ownerIssuedBy")} placeholder="District office / CDO office" autoComplete="off" /></FL>
         </Section>
 
         {/* ── 4. LAND ── */}
@@ -495,21 +483,33 @@ export default function MobileCollectPage({ token, shortCode }) {
 
         {/* ── 8. BUILDING ── */}
         <Section icon="🏗️" title="Building">
-          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-            {[["yes","✅ Yes, building present"],["no","❌ No building"]].map(([val, lbl]) => (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+            {[
+              ["yes",           "✅ Yes — building present and valuing"],
+              ["yes_not_valuing","⚠️ Yes — building present but not valuing"],
+              ["no",            "❌ No building"],
+            ].map(([val, lbl]) => (
               <button key={val} type="button"
-                onClick={() => setHasBuilding(val === "yes")}
-                style={{ flex: 1, padding: "10px 6px", borderRadius: 8, border: `2px solid ${hasBuilding === (val==="yes") ? "#1a73e8" : "#ddd"}`, background: hasBuilding === (val==="yes") ? "#e8f0fe" : "#f8f9fa", color: hasBuilding === (val==="yes") ? "#1a73e8" : "#555", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+                onClick={() => setHasBuilding(val)}
+                style={{ padding: "10px 14px", borderRadius: 8, textAlign: "left",
+                  border: `2px solid ${hasBuilding === val ? "#1a73e8" : "#ddd"}`,
+                  background: hasBuilding === val ? "#e8f0fe" : "#f8f9fa",
+                  color: hasBuilding === val ? "#1a73e8" : "#555",
+                  cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
                 {lbl}
               </button>
             ))}
           </div>
 
-          {hasBuilding === true && (
+          {hasBuilding === "yes" && (
             <div>
               <Row2>
-                <FL label="No. of Floors"><input style={S.input} type="number" min="0" value={building.numFloors} onChange={setB("numFloors")} placeholder="e.g. 3" /></FL>
-                <FL label="Year of Construction"><input style={S.input} type="number" min="1900" max="2100" value={building.yearOfConstruction} onChange={setB("yearOfConstruction")} placeholder="e.g. 2010" /></FL>
+                <FL label="No. of Floors">
+                  <input style={S.input} type="number" min="0" value={building.numFloors} onChange={setB("numFloors")} placeholder="e.g. 3" />
+                </FL>
+                <FL label={<>Total Built Area <span style={S.unit}>(sq.ft)</span></>}>
+                  <input style={S.input} type="number" min="0" value={building.totalAreaSqft} onChange={setB("totalAreaSqft")} placeholder="0" />
+                </FL>
               </Row2>
               <Row2>
                 <FL label="Structure Type">
@@ -523,25 +523,11 @@ export default function MobileCollectPage({ token, shortCode }) {
                   </select>
                 </FL>
               </Row2>
-              <Row2>
-                <FL label="Face Direction">
-                  <select style={S.select} value={building.faceDirection} onChange={setB("faceDirection")}>
-                    <option value="">— Select —</option>{FACE_DIRECTIONS.map(t => <option key={t}>{t}</option>)}
-                  </select>
-                </FL>
-                <FL label={<>Total Built Area <span style={S.unit}>(sq.ft)</span></>}>
-                  <input style={S.input} type="number" min="0" value={building.totalAreaSqft} onChange={setB("totalAreaSqft")} placeholder="0" />
-                </FL>
-              </Row2>
-              <Row2>
-                <FL label="Expected Life (yrs)"><input style={S.input} type="number" min="0" value={building.expectedLife} onChange={setB("expectedLife")} placeholder="60" /></FL>
-                <FL label="Building Permit">
-                  <select style={S.select} value={building.buildingPermit} onChange={setB("buildingPermit")}>
-                    <option value="">— Select —</option>
-                    <option>Available</option><option>Not Available</option><option>In Process</option>
-                  </select>
-                </FL>
-              </Row2>
+              <FL label="Face Direction">
+                <select style={S.select} value={building.faceDirection} onChange={setB("faceDirection")}>
+                  <option value="">— Select —</option>{FACE_DIRECTIONS.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </FL>
               <FL label="Building Remarks">
                 <textarea style={{ ...S.input, height: 70, resize: "vertical" }} value={building.remarks} onChange={setB("remarks")} placeholder="Condition, defects, observations…" />
               </FL>
