@@ -3658,6 +3658,10 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
           amountReceived={amountReceived}
           setAmountReceived={setAmountReceived}
           finalFMV={finalFMValue}
+          clients={clients}
+          owners={owners}
+          hasBuilding={hasBuilding}
+          properties={properties}
         />
       ),
     },

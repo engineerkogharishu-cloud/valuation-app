@@ -47,39 +47,109 @@ export function calcValuationFee(fmv) {
 }
 
 // ── Missing Document Checklist ────────────────────────────────────────────────
-const DEFAULT_DOCS = [
-  "Land Ownership Certificate (Lalpurja)",
-  "Property Tax Receipt (Malpot)",
-  "Blueprint / Site Plan",
-  "Tracemap",
-  "Citizenship Certificate of Owner",
-  "Field Measurement Certificate",
-  "Recent Photographs",
-  "Legal Documents",
-];
+// Build the dynamic default doc list from form state
+function buildDefaultDocs(clients, owners, hasBuilding, properties) {
+  const docs = [];
+  let id = 0;
+  const mk = (label, group) => ({ id: id++, label, available: false, group, custom: false });
 
-function MissingDocumentPanel() {
-  const [docs, setDocs] = React.useState(() =>
-    DEFAULT_DOCS.map((label, i) => ({ id: i, label, available: false }))
-  );
+  // Per-client citizenships
+  (clients || []).forEach((cl, i) => {
+    if (cl.showPerson) {
+      const name = cl.person?.name?.trim() || `Client ${i + 1}`;
+      docs.push(mk(`Citizenship of Client — ${name}`, "client"));
+    }
+  });
+
+  // Per-owner citizenships
+  (owners || []).forEach((ow, i) => {
+    if (ow.showPerson) {
+      const name = ow.person?.name?.trim() || `Owner ${i + 1}`;
+      docs.push(mk(`Citizenship of Owner — ${name}`, "owner"));
+    }
+  });
+
+  // Always-present land docs
+  docs.push(mk("Land Ownership Certificate (Lalpurja)", "land"));
+  docs.push(mk("Trace", "land"));
+  docs.push(mk("Tiro", "land"));
+  docs.push(mk("Charkilla", "land"));
+  docs.push(mk("Field Book or Shresta", "land"));
+  docs.push(mk("Road Verification Letter", "land"));
+  docs.push(mk("Land Registration Paper", "land"));
+
+  // Guthi Raitani — only if any property has that ownership type
+  const hasGuthi = (properties || []).some(p => p.ownershipType === "Guthi Raitani");
+  if (hasGuthi) docs.push(mk("Guthi Raitani Letter", "land"));
+
+  // Company docs — only if any client or owner has showCompany
+  const hasCompany = [...(clients || []), ...(owners || [])].some(p => p.showCompany);
+  if (hasCompany) {
+    docs.push(mk("Company Registration", "company"));
+    docs.push(mk("Company PAN", "company"));
+    docs.push(mk("Company Tax Clearance", "company"));
+    docs.push(mk("Share Lagat", "company"));
+  }
+
+  // Building docs — only if hasBuilding is true
+  if (hasBuilding === true) {
+    docs.push(mk("Building Ijajat (Asthai / Sthai)", "building"));
+    docs.push(mk("Building Nirman Sampanna", "building"));
+    docs.push(mk("Building Naksa", "building"));
+  }
+
+  return docs;
+}
+
+const GROUP_META = {
+  client:   { label: "Client",   color: "#1a73e8", bg: "#e8f0fe" },
+  owner:    { label: "Owner",    color: "#6d28d9", bg: "#ede9fe" },
+  land:     { label: "Land",     color: "#0f766e", bg: "#ccfbf1" },
+  company:  { label: "Company",  color: "#b45309", bg: "#fef3c7" },
+  building: { label: "Building", color: "#be185d", bg: "#fce7f3" },
+  custom:   { label: "Custom",   color: "#374151", bg: "#f3f4f6" },
+};
+
+function MissingDocumentPanel({ clients, owners, hasBuilding, properties }) {
+  const [checks, setChecks] = React.useState({}); // { [label]: true/false }
   const [collapsed, setCollapsed] = React.useState(false);
   const [newText, setNewText] = React.useState("");
-  const nextId = React.useRef(DEFAULT_DOCS.length);
+  const [customDocs, setCustomDocs] = React.useState([]); // extra labels added by user
+  const nextId = React.useRef(1000);
 
-  const toggle = (id) =>
-    setDocs(prev => prev.map(d => d.id === id ? { ...d, available: !d.available } : d));
+  const defaultDocs = React.useMemo(
+    () => buildDefaultDocs(clients, owners, hasBuilding, properties),
+    [clients, owners, hasBuilding, properties]
+  );
+
+  const allDocs = [
+    ...defaultDocs,
+    ...customDocs.map(label => ({ id: nextId.current++, label, available: false, group: "custom", custom: true })),
+  ];
+
+  // Re-map available state from checks map
+  const docs = allDocs.map(d => ({ ...d, available: !!checks[d.label] }));
+
+  const toggle = (label) => setChecks(prev => ({ ...prev, [label]: !prev[label] }));
 
   const addDoc = () => {
     const text = newText.trim();
-    if (!text) return;
-    setDocs(prev => [...prev, { id: nextId.current++, label: text, available: false }]);
+    if (!text || customDocs.includes(text)) return;
+    setCustomDocs(prev => [...prev, text]);
     setNewText("");
   };
 
-  const removeDoc = (id) => setDocs(prev => prev.filter(d => d.id !== id));
+  const removeCustom = (label) => {
+    setCustomDocs(prev => prev.filter(l => l !== label));
+    setChecks(prev => { const n = { ...prev }; delete n[label]; return n; });
+  };
 
   const missing = docs.filter(d => !d.available);
-  const available = docs.filter(d => d.available);
+  const availableCount = docs.filter(d => d.available).length;
+
+  // Group docs for rendering
+  const groupOrder = ["client", "owner", "land", "company", "building", "custom"];
+  const grouped = groupOrder.map(g => ({ g, items: docs.filter(d => d.group === g) })).filter(x => x.items.length > 0);
 
   return (
     <div style={{ background: "#fff", border: "1.5px solid #dde1e7", borderRadius: 12, overflow: "hidden" }}>
@@ -91,7 +161,7 @@ function MissingDocumentPanel() {
         <span>📂 Missing Documents</span>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>
-            {available.length}/{docs.length} available
+            {availableCount}/{docs.length} available
             {missing.length > 0 && <span style={{ marginLeft: 8, background: "rgba(255,255,255,0.25)", borderRadius: 10, padding: "1px 8px" }}>⚠ {missing.length} missing</span>}
           </span>
           <span style={{ fontSize: 16, opacity: 0.8 }}>{collapsed ? "▶" : "▼"}</span>
@@ -100,57 +170,65 @@ function MissingDocumentPanel() {
 
       {!collapsed && (
         <div style={{ padding: "16px 18px" }}>
-          {/* Document list */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-            {docs.map(doc => (
-              <div key={doc.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 8, border: `1.5px solid ${doc.available ? "#27ae60" : "#f39c12"}`, background: doc.available ? "#f0fdf4" : "#fffbea" }}>
-                <input
-                  type="checkbox"
-                  checked={doc.available}
-                  onChange={() => toggle(doc.id)}
-                  style={{ width: 16, height: 16, accentColor: "#27ae60", cursor: "pointer", flexShrink: 0 }}
-                />
-                <span style={{ flex: 1, fontSize: 13, color: doc.available ? "#1a5c3a" : "#7a5c00", fontWeight: doc.available ? 500 : 400 }}>
-                  {doc.label}
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: doc.available ? "#27ae60" : "#f39c12", color: "#fff", whiteSpace: "nowrap" }}>
-                  {doc.available ? "✓ Available" : "⚠ Ask Client"}
-                </span>
-                {!DEFAULT_DOCS.includes(doc.label) && (
-                  <button
-                    onClick={() => removeDoc(doc.id)}
-                    style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
-                    title="Remove"
-                  >×</button>
-                )}
-              </div>
-            ))}
+          {/* Grouped document list */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 16 }}>
+            {grouped.map(({ g, items }) => {
+              const meta = GROUP_META[g] || GROUP_META.custom;
+              return (
+                <div key={g}>
+                  <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.8px", color: meta.color, marginBottom: 6, paddingLeft: 2 }}>
+                    {meta.label} Documents
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {items.map(doc => (
+                      <div key={doc.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${doc.available ? "#27ae60" : "#f39c12"}`, background: doc.available ? "#f0fdf4" : "#fffbea" }}>
+                        <input
+                          type="checkbox"
+                          checked={doc.available}
+                          onChange={() => toggle(doc.label)}
+                          style={{ width: 16, height: 16, accentColor: "#27ae60", cursor: "pointer", flexShrink: 0 }}
+                        />
+                        <span style={{ flex: 1, fontSize: 13, color: doc.available ? "#1a5c3a" : "#7a5c00", fontWeight: doc.available ? 500 : 400 }}>
+                          {doc.label}
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: doc.available ? "#27ae60" : "#f39c12", color: "#fff", whiteSpace: "nowrap" }}>
+                          {doc.available ? "✓ Available" : "⚠ Ask Client"}
+                        </span>
+                        {doc.custom && (
+                          <button onClick={() => removeCustom(doc.label)}
+                            style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
+                            title="Remove">×</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Add custom document */}
           <div style={{ display: "flex", gap: 8 }}>
             <input
-              type="text"
-              value={newText}
+              type="text" value={newText}
               onChange={e => setNewText(e.target.value)}
               onKeyDown={e => e.key === "Enter" && addDoc()}
               placeholder="Add custom document (press Enter or click +)"
               style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #dde1e7", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }}
             />
-            <button
-              onClick={addDoc}
-              disabled={!newText.trim()}
-              style={{ padding: "9px 18px", background: newText.trim() ? "linear-gradient(135deg,#7c3aed,#a855f7)" : "#ccc", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: newText.trim() ? "pointer" : "not-allowed" }}
-            >+ Add</button>
+            <button onClick={addDoc} disabled={!newText.trim()}
+              style={{ padding: "9px 18px", background: newText.trim() ? "linear-gradient(135deg,#7c3aed,#a855f7)" : "#ccc", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: newText.trim() ? "pointer" : "not-allowed" }}>
+              + Add
+            </button>
           </div>
 
-          {/* Summary */}
+          {/* Missing summary */}
           {missing.length > 0 && (
             <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "#fff8e1", border: "1.5px solid #f39c12" }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#7a5c00", marginBottom: 5 }}>📋 Documents to Request from Client:</div>
               <ul style={{ margin: 0, paddingLeft: 18 }}>
                 {missing.map(d => (
-                  <li key={d.id} style={{ fontSize: 12, color: "#7a5c00", marginBottom: 2 }}>{d.label}</li>
+                  <li key={d.label} style={{ fontSize: 12, color: "#7a5c00", marginBottom: 2 }}>{d.label}</li>
                 ))}
               </ul>
             </div>
@@ -254,6 +332,7 @@ export default function ReportSection({
   billQrCode, setBillQrCode,
   amountReceived, setAmountReceived,
   finalFMV,
+  clients, owners, hasBuilding, properties,
 }) {
   const [html, setHtml] = React.useState(null);
   const [fullHtml, setFullHtml] = React.useState(null);
@@ -503,7 +582,7 @@ export default function ReportSection({
       </div>
 
       {/* ── Missing Document Checklist ── */}
-      <MissingDocumentPanel />
+      <MissingDocumentPanel clients={clients} owners={owners} hasBuilding={hasBuilding} properties={properties} />
 
       {/* ── Bill Summary Panel ── */}
       {reportType === "preliminary" && fieldChargeReceived !== null && (
