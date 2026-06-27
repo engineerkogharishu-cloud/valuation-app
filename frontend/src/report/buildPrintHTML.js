@@ -1850,7 +1850,21 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
   const fieldFee   = parseFloat(s.fieldChargeAmount)    || 0;
   const transport  = parseFloat(s.transportationCharge) || 0;
   const fieldVisit = fieldFee + transport;
-  const valFee     = calcValFee(finalFMV);
+  // Use company-configured tiers if provided via state, else fall back to built-in schedule
+  const valFee     = (() => {
+    const tiers = s.feeTiers;
+    if (!tiers || !Array.isArray(tiers) || tiers.length === 0) return calcValFee(finalFMV);
+    const fmv = finalFMV;
+    if (fmv <= 0) return 0;
+    const floors = tiers.map((_, i) => i === 0 ? 0 : (tiers[i-1].upto == null ? Infinity : Number(tiers[i-1].upto)));
+    if (fmv <= Number(tiers[0].upto)) return Number(tiers[0].base) || 0;
+    for (let i = 1; i < tiers.length; i++) {
+      const ceil = tiers[i].upto == null ? Infinity : Number(tiers[i].upto);
+      if (fmv <= ceil) return Math.round(Number(tiers[i].base) + (fmv - floors[i]) * Number(tiers[i].rate));
+    }
+    const last = tiers[tiers.length - 1];
+    return Math.round(Number(last.base) + (fmv - floors[floors.length - 1]) * Number(last.rate));
+  })();
   const extraAmt   = parseFloat(s.extraChargeAmount)    || 0;
   const subTotal   = fieldVisit + valFee + extraAmt;
   const advance    = fieldVisit; // field charge is recorded as advance

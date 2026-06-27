@@ -355,15 +355,15 @@ export default function ReportSection({
   const { requestPrint, ConfirmDialog, creditData } = usePrintCredit(reportId);
 
   // Resolve which tiers apply: bank-specific → "Default" → built-in NRB schedule
-  const currentBank = collectState().bank || "";
   const resolvedTiers = React.useMemo(() => {
     const normalize = (list) => list.map(t => ({ ...t, upto: t.upto === null ? Infinity : t.upto }));
-    if (feeTiersMap[currentBank] && feeTiersMap[currentBank].length > 0)
-      return normalize(feeTiersMap[currentBank]);
+    const bank = collectState().bank || "";
+    if (feeTiersMap[bank] && feeTiersMap[bank].length > 0)
+      return normalize(feeTiersMap[bank]);
     if (feeTiersMap["Default"] && feeTiersMap["Default"].length > 0)
       return normalize(feeTiersMap["Default"]);
     return DEFAULT_FEE_TIERS;
-  }, [feeTiersMap, currentBank]);
+  }, [feeTiersMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const valuationFee = calcValuationFeeWithTiers(finalFMV || 0, resolvedTiers);
 
@@ -401,7 +401,7 @@ export default function ReportSection({
     showToast("⏳ Generating bill preview…");
     try {
       const selectedPM = paymentMethods.find(m => m.id === selectedPaymentMethodId) || null;
-      const state = { ...collectState(), finalFMV: finalFMV || 0, billQrCode: billQrCode || "", selectedPaymentMethod: selectedPM };
+      const state = { ...collectState(), finalFMV: finalFMV || 0, billQrCode: billQrCode || "", selectedPaymentMethod: selectedPM, feeTiers: resolvedTiers };
       await fetchLetterhead(state);
       const full = buildPrintHTML(state, getFileName("pdf"), false, {});
       setFullHtml(full);
@@ -409,7 +409,7 @@ export default function ReportSection({
     } finally {
       setLoading(false);
     }
-  }, [collectState, fetchLetterhead, getFileName, showToast, finalFMV, billQrCode, paymentMethods, selectedPaymentMethodId]);
+  }, [collectState, fetchLetterhead, getFileName, showToast, finalFMV, billQrCode, paymentMethods, selectedPaymentMethodId, resolvedTiers]);
 
   const doPrintBill = React.useCallback(() => {
     if (!fullHtml) return;
