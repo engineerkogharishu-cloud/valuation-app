@@ -342,6 +342,7 @@ export default function ReportSection({
   billQrCode, setBillQrCode,
   amountReceived, setAmountReceived,
   finalFMV,
+  bank,
   clients, owners, hasBuilding, properties,
 }) {
   const [html, setHtml] = React.useState(null);
@@ -357,13 +358,13 @@ export default function ReportSection({
   // Resolve which tiers apply: bank-specific → "Default" → built-in NRB schedule
   const resolvedTiers = React.useMemo(() => {
     const normalize = (list) => list.map(t => ({ ...t, upto: t.upto === null ? Infinity : t.upto }));
-    const bank = collectState().bank || "";
-    if (feeTiersMap[bank] && feeTiersMap[bank].length > 0)
-      return normalize(feeTiersMap[bank]);
+    const bankKey = bank || "";
+    if (feeTiersMap[bankKey] && feeTiersMap[bankKey].length > 0)
+      return normalize(feeTiersMap[bankKey]);
     if (feeTiersMap["Default"] && feeTiersMap["Default"].length > 0)
       return normalize(feeTiersMap["Default"]);
     return DEFAULT_FEE_TIERS;
-  }, [feeTiersMap]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [feeTiersMap, bank]);
 
   const valuationFee = calcValuationFeeWithTiers(finalFMV || 0, resolvedTiers);
 
@@ -406,6 +407,10 @@ export default function ReportSection({
       const full = buildPrintHTML(state, getFileName("pdf"), false, {});
       setFullHtml(full);
       setHtml(full.replace(/<div class="no-print">[\s\S]*?<\/div>/, ""));
+      showToast("✅ Bill preview ready");
+    } catch (err) {
+      showToast("❌ Bill generation failed: " + (err?.message || String(err)));
+      console.error("doPreviewBill error:", err);
     } finally {
       setLoading(false);
     }
@@ -435,6 +440,9 @@ export default function ReportSection({
       const full = buildPrintHTML(state, getFileName("pdf"), false, mapSnapshots);
       setFullHtml(full);
       setHtml(full.replace(/<div class="no-print">[\s\S]*?<\/div>/, ""));
+    } catch (err) {
+      showToast("❌ Report generation failed: " + (err?.message || String(err)));
+      console.error("doGenerate error:", err);
     } finally {
       setLoading(false);
     }
