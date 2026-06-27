@@ -143,6 +143,13 @@ export const api = {
   generateFieldToken: () =>
     request("/field/token", { method: "POST" }),
 
+  // Field collection links (short codes)
+  createFieldLink: (data) =>
+    request("/field/links", { method: "POST", body: JSON.stringify(data) }),
+  listFieldLinks: () => request("/field/links"),
+  deleteFieldLink: (id) =>
+    request(`/field/links/${id}`, { method: "DELETE" }),
+
   listFieldSubmissions: () =>
     request("/field/submissions"),
 

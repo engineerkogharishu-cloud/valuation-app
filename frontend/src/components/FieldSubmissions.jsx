@@ -115,29 +115,25 @@ export default function FieldSubmissions({ onUseData, user }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [delId,    setDelId]    = useState(null);
 
-  // Try to restore a previously generated (non-expired) token from storage
-  const [storedToken, setStoredToken] = useState(() => {
-    try {
-      const raw = localStorage.getItem("fieldCollectToken_v2");
-      if (!raw) return "";
-      const payload = JSON.parse(atob(raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-      if (payload.exp && payload.exp * 1000 < Date.now()) { localStorage.removeItem("fieldCollectToken_v2"); return ""; }
-      return raw;
-    } catch { return ""; }
-  });
-  const buildUrl = (tok) => `${window.location.origin}${window.location.pathname.replace(/\/$/, "")}?collect=${tok}`;
-  const [tokenUrl, setTokenUrl] = useState(() => {
-    try {
-      const raw = localStorage.getItem("fieldCollectToken_v2");
-      if (!raw) return "";
-      const payload = JSON.parse(atob(raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-      if (payload.exp && payload.exp * 1000 < Date.now()) return "";
-      return `${window.location.origin}${window.location.pathname.replace(/\/$/, "")}?collect=${raw}`;
-    } catch { return ""; }
-  });
-  const [genLoading, setGenLoading] = useState(false);
-  const [copied,   setCopied]   = useState(false);
-  const [showQr,   setShowQr]   = useState(false);
+  // ── Link management ─────────────────────────────────────────
+  const [links,       setLinks]       = useState([]);
+  const [linksLoaded, setLinksLoaded] = useState(false);
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [newLinkType,  setNewLinkType]  = useState("permanent");
+  const [newLinkLabel, setNewLinkLabel] = useState("");
+  const [newLinkDays,  setNewLinkDays]  = useState(7);
+  const [genLoading,   setGenLoading]   = useState(false);
+  const [copiedId,     setCopiedId]     = useState(null);
+  const [showQrId,     setShowQrId]     = useState(null);
+
+  const shortUrl = (code) => `${window.location.origin}/collect/${code}`;
+
+  const loadLinks = useCallback(async () => {
+    try { const d = await api.listFieldLinks(); setLinks(Array.isArray(d) ? d : []); setLinksLoaded(true); }
+    catch (_) { setLinksLoaded(true); }
+  }, []);
+
+  useEffect(() => { loadLinks(); }, [loadLinks]);
   const [importError, setImportError] = useState("");
   const [importing,   setImporting]   = useState(false);
   const fileInputRef = useRef();
@@ -245,23 +241,32 @@ export default function FieldSubmissions({ onUseData, user }) {
     a.click();
   };
 
-  const generateLink = async () => {
+  const createLink = async () => {
     setGenLoading(true);
     try {
-      const { token } = await api.generateFieldToken();
-      localStorage.setItem("fieldCollectToken_v2", token);
-      setStoredToken(token);
-      setTokenUrl(buildUrl(token));
-      setShowQr(false);
+      const payload = { label: newLinkLabel.trim() || (newLinkType === "permanent" ? "Permanent Link" : "Temporary Link"), link_type: newLinkType };
+      if (newLinkType === "temporary") payload.expires_days = Number(newLinkDays) || 7;
+      await api.createFieldLink(payload);
+      await loadLinks();
+      setShowLinkForm(false);
+      setNewLinkLabel("");
+      setNewLinkType("permanent");
+      setNewLinkDays(7);
     } catch (e) {
-      alert("Failed to generate link: " + e.message);
+      alert("Failed to create link: " + e.message);
     } finally {
       setGenLoading(false);
     }
   };
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(tokenUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  const deactivateLink = async (id) => {
+    if (!window.confirm("Deactivate this link? Field staff using it will no longer be able to submit.")) return;
+    try { await api.deleteFieldLink(id); await loadLinks(); }
+    catch (e) { alert("Failed: " + e.message); }
+  };
+
+  const copyUrl = (code) => {
+    navigator.clipboard.writeText(shortUrl(code)).then(() => { setCopiedId(code); setTimeout(() => setCopiedId(null), 2000); });
   };
 
   const handleImportFile = async (e) => {
@@ -298,102 +303,132 @@ export default function FieldSubmissions({ onUseData, user }) {
 
   return (
     <div>
-      {/* ── Mobile Collection Link (admin only) ── */}
-      {isAdmin && (() => {
-        // Decode expiry from stored token
-        let expiryLabel = "";
-        if (storedToken) {
-          try {
-            const payload = JSON.parse(atob(storedToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-            if (payload.exp) {
-              const d = new Date(payload.exp * 1000);
-              expiryLabel = `Valid until ${d.toLocaleDateString(undefined, { day:"numeric", month:"short", year:"numeric" })}`;
-            }
-          } catch (_) {}
-        }
-        const qrSrc = tokenUrl
-          ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(tokenUrl)}`
-          : "";
-
-        return (
-          <div style={{ background: "linear-gradient(135deg,#0f1f3d,#1a3a6b)", borderRadius: 14, padding: "22px 24px", marginBottom: 24, color: "#fff", boxShadow: "0 4px 20px rgba(0,0,0,0.18)" }}>
-            {/* Header row */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
-              <div>
-                <div style={{ fontSize: 16, fontWeight: 800, display: "flex", alignItems: "center", gap: 8 }}>
-                  📱 Mobile Field Collection Link
-                </div>
-                <p style={{ margin: "4px 0 0", fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.5 }}>
-                  Share this link with field staff — they open it on their phone, fill in property data and photos, and it appears here instantly. No login required.
-                </p>
-              </div>
-              <button
-                onClick={generateLink}
-                disabled={genLoading}
-                style={{ padding: "9px 18px", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.22)"}
-                onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
-              >
-                {genLoading ? "Generating…" : tokenUrl ? "🔄 Refresh Link" : "⚡ Generate Link"}
-              </button>
+      {/* ── Mobile Collection Links (admin only) ── */}
+      {isAdmin && (
+        <div style={{ background: "linear-gradient(135deg,#0f1f3d,#1a3a6b)", borderRadius: 14, padding: "20px 22px", marginBottom: 24, color: "#fff", boxShadow: "0 4px 20px rgba(0,0,0,0.18)" }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>📱 Mobile Collection Links</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>Share with field staff — no login needed</div>
             </div>
-
-            {tokenUrl ? (
-              <div>
-                {/* Link box */}
-                <div style={{ background: "rgba(0,0,0,0.25)", borderRadius: 10, padding: "12px 14px", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
-                  <input
-                    readOnly
-                    value={tokenUrl}
-                    onClick={e => e.target.select()}
-                    style={{ flex: 1, minWidth: 200, background: "transparent", border: "none", color: "#7dd3fc", fontFamily: "monospace", fontSize: 12, outline: "none", wordBreak: "break-all" }}
-                  />
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                    <button
-                      onClick={copyLink}
-                      style={{ padding: "7px 14px", background: copied ? "#22c55e" : "#1a73e8", border: "none", borderRadius: 7, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 }}
-                    >{copied ? "✓ Copied!" : "Copy"}</button>
-                    {navigator.share && (
-                      <button
-                        onClick={() => navigator.share({ title: "Field Data Collection", url: tokenUrl }).catch(() => {})}
-                        style={{ padding: "7px 14px", background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 7, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 }}
-                      >Share</button>
-                    )}
-                    <button
-                      onClick={() => setShowQr(q => !q)}
-                      style={{ padding: "7px 14px", background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 7, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 }}
-                    >{showQr ? "Hide QR" : "📷 QR Code"}</button>
-                  </div>
-                </div>
-
-                {/* Expiry + QR */}
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 20, flexWrap: "wrap" }}>
-                  <div>
-                    {expiryLabel && (
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 6 }}>🕐 {expiryLabel} · <span style={{ color: "rgba(255,255,255,0.35)" }}>generate a new link after expiry</span></div>
-                    )}
-                    <div style={{ display: "flex", gap: 16, fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
-                      <span>✅ Works on any phone browser</span>
-                      <span>✅ No login needed</span>
-                      <span>✅ Company-specific</span>
-                    </div>
-                  </div>
-                  {showQr && qrSrc && (
-                    <div style={{ background: "#fff", borderRadius: 10, padding: 8, display: "inline-block", flexShrink: 0 }}>
-                      <img src={qrSrc} alt="QR Code" width={120} height={120} style={{ display: "block" }} />
-                      <div style={{ fontSize: 10, color: "#555", textAlign: "center", marginTop: 4 }}>Scan to open</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", fontStyle: "italic" }}>
-                Click "Generate Link" to create a mobile collection link for your field staff.
-              </div>
-            )}
+            <button onClick={() => setShowLinkForm(f => !f)}
+              style={{ padding: "8px 16px", background: showLinkForm ? "rgba(255,255,255,0.1)" : "#1a73e8", border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+              {showLinkForm ? "✕ Cancel" : "+ New Link"}
+            </button>
           </div>
-        );
-      })()}
+
+          {/* New link form */}
+          {showLinkForm && (
+            <div style={{ background: "rgba(0,0,0,0.25)", borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 10 }}>CREATE NEW LINK</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <div style={{ flex: 1, minWidth: 140 }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>LABEL (optional)</div>
+                  <input value={newLinkLabel} onChange={e => setNewLinkLabel(e.target.value)}
+                    placeholder="e.g. Pokhara team"
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 13, boxSizing: "border-box", outline: "none" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>TYPE</div>
+                  <div style={{ display: "flex", gap: 0, borderRadius: 7, overflow: "hidden", border: "1px solid rgba(255,255,255,0.2)" }}>
+                    {["permanent","temporary"].map(t => (
+                      <button key={t} onClick={() => setNewLinkType(t)}
+                        style={{ padding: "8px 14px", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, background: newLinkType === t ? "#1a73e8" : "rgba(255,255,255,0.08)", color: "#fff" }}>
+                        {t === "permanent" ? "♾ Permanent" : "⏱ Temporary"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {newLinkType === "temporary" && (
+                  <div>
+                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>EXPIRES IN</div>
+                    <select value={newLinkDays} onChange={e => setNewLinkDays(e.target.value)}
+                      style={{ padding: "8px 10px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 13, outline: "none" }}>
+                      <option value={1}>1 day</option>
+                      <option value={3}>3 days</option>
+                      <option value={7}>7 days</option>
+                      <option value={14}>14 days</option>
+                      <option value={30}>30 days</option>
+                    </select>
+                  </div>
+                )}
+                <button onClick={createLink} disabled={genLoading}
+                  style={{ padding: "8px 18px", background: "#22c55e", border: "none", borderRadius: 7, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>
+                  {genLoading ? "Creating…" : "⚡ Create"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Links list */}
+          {linksLoaded && links.length === 0 && !showLinkForm && (
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", fontStyle: "italic", textAlign: "center", padding: "8px 0" }}>
+              No links yet. Click "+ New Link" to create one.
+            </div>
+          )}
+
+          {links.map(lnk => {
+            const url    = shortUrl(lnk.short_code);
+            const isCopied = copiedId === lnk.short_code;
+            const isQr   = showQrId === lnk.short_code;
+            const expired = lnk.expires_at && new Date(lnk.expires_at) < new Date();
+            const expiresLabel = lnk.expires_at
+              ? (expired ? "⛔ Expired" : `⏱ Expires ${new Date(lnk.expires_at).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"})}`)
+              : "♾ Permanent";
+
+            return (
+              <div key={lnk.id} style={{ background: expired ? "rgba(180,0,0,0.18)" : "rgba(0,0,0,0.22)", borderRadius: 10, padding: "10px 14px", marginBottom: 8, opacity: expired ? 0.7 : 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  {/* Label + type badge */}
+                  <div style={{ flex: 1, minWidth: 120 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#fff" }}>{lnk.label || "Collection Link"}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 1 }}>{expiresLabel}</div>
+                  </div>
+                  {/* Short URL */}
+                  <div style={{ fontFamily: "monospace", fontSize: 13, color: "#7dd3fc", background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "4px 10px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 }}>
+                    {url.replace(/^https?:\/\//, "")}
+                  </div>
+                  {/* Actions */}
+                  <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                    <button onClick={() => copyUrl(lnk.short_code)}
+                      style={{ padding: "5px 12px", background: isCopied ? "#22c55e" : "#1a73e8", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                      {isCopied ? "✓" : "Copy"}
+                    </button>
+                    {navigator.share && (
+                      <button onClick={() => navigator.share({ title: lnk.label || "Field Collection", url }).catch(() => {})}
+                        style={{ padding: "5px 10px", background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12 }}>
+                        Share
+                      </button>
+                    )}
+                    <button onClick={() => setShowQrId(isQr ? null : lnk.short_code)}
+                      style={{ padding: "5px 10px", background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12 }}>
+                      QR
+                    </button>
+                    <button onClick={() => deactivateLink(lnk.id)}
+                      style={{ padding: "5px 10px", background: "rgba(200,0,0,0.35)", border: "none", borderRadius: 6, color: "#ffaaaa", cursor: "pointer", fontSize: 12 }}>
+                      ✕
+                    </button>
+                  </div>
+                </div>
+                {/* QR panel */}
+                {isQr && (
+                  <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{ background: "#fff", borderRadius: 8, padding: 6, display: "inline-block" }}>
+                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(url)}`}
+                        alt="QR" width={110} height={110} style={{ display: "block" }} />
+                    </div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>
+                      Scan with any phone camera<br />to open the collection form.<br />
+                      <span style={{ fontFamily: "monospace", color: "#7dd3fc", fontSize: 11 }}>{url}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── Submissions list ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>

@@ -10,8 +10,11 @@ import MobileCollectPage from "./pages/MobileCollectPage";
 import { api } from "./services/api";
 import { DevCredit } from "./components/ui/DeveloperCard";
 
-// Check if this is a mobile field-collection URL (?collect=TOKEN)
+// Check if this is a mobile field-collection URL
+// Supports: ?collect=TOKEN (old) and /collect/SHORTCODE (new)
+const _pathMatch = window.location.pathname.match(/^\/collect\/([A-Za-z0-9]{4,12})$/i);
 const collectToken = new URLSearchParams(window.location.search).get("collect");
+const collectShortCode = _pathMatch ? _pathMatch[1].toUpperCase() : null;
 
 // ── User Dashboard ────────────────────────────────────────────
 function UserApp({ user }) {
@@ -174,6 +177,7 @@ export default function App() {
   };
 
   if (collectToken) return <MobileCollectPage token={collectToken} />;
+  if (collectShortCode) return <MobileCollectPage shortCode={collectShortCode} />;
 
   if (!user) return <LoginPage onLogin={handleLogin} />;
 

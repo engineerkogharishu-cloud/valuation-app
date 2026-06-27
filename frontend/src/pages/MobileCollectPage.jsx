@@ -107,7 +107,7 @@ async function flushQueue() {
   return sent;
 }
 
-export default function MobileCollectPage({ token }) {
+export default function MobileCollectPage({ token, shortCode }) {
   const [companyName, setCompanyName] = useState("");
   const [banks,       setBanks]       = useState([]);
   const [tokenError,  setTokenError]  = useState("");
@@ -190,7 +190,25 @@ export default function MobileCollectPage({ token }) {
   const [gpsLoading,  setGpsLoading]  = useState(false);
   const fileRef = useRef();
 
+  // Short-code mode: resolve code → get company info directly
   useEffect(() => {
+    if (!shortCode) return;
+    fetch(`${API_BASE}/field/link/${encodeURIComponent(shortCode)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { setTokenError(d.error); return; }
+        setCompanyName(d.companyName || d.companyCode || "");
+        setBanks(Array.isArray(d.banks) ? d.banks : []);
+      })
+      .catch(() => {
+        if (!navigator.onLine) return; // allow offline, payload uses shortCode directly
+        setTokenError("Could not verify link. Check your internet connection.");
+      });
+  }, [shortCode]);
+
+  // Old token mode: verify token → get company info
+  useEffect(() => {
+    if (!token) return;
     fetch(`${API_BASE}/field/company-info?token=${encodeURIComponent(token)}`)
       .then((r) => r.json())
       .then((d) => {
@@ -240,7 +258,7 @@ export default function MobileCollectPage({ token }) {
   };
 
   const buildPayload = () => ({
-    token,
+    ...(shortCode ? { short_code: shortCode } : { token }),
     data: {
       ...form,
       plotNos: plotNos.map((p) => p.trim()).filter(Boolean),
@@ -276,7 +294,7 @@ export default function MobileCollectPage({ token }) {
 
     // ── Offline: queue it ─────────────────────────────────
     if (!navigator.onLine) {
-      saveToQueue(token, payload);
+      saveToQueue(shortCode || token, payload);
       updatePending();
       setSubmitting(false);
       setSubmitted(true);
