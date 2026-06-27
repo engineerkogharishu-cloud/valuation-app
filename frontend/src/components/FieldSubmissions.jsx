@@ -297,13 +297,14 @@ export default function FieldSubmissions({ onUseData, user }) {
 
   const deactivateLink = async (id) => {
     setDelLinkError("");
+    setConfirmDelLinkId(null);
     try {
       await api.deleteFieldLink(id);
-      setConfirmDelLinkId(null);
-      setLinks(prev => prev.filter(l => l.id !== id));
+      setLinks(prev => prev.filter(l => String(l.id) !== String(id)));
+      await loadLinks();
     } catch (e) {
-      setConfirmDelLinkId(null);
       setDelLinkError("Delete failed: " + e.message);
+      await loadLinks();
     }
   };
 
