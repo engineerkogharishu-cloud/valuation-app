@@ -160,6 +160,7 @@ export default function FieldSubmissions({ onUseData, user }) {
   const [copiedId,     setCopiedId]     = useState(null);
   const [showQrId,     setShowQrId]     = useState(null);
   const [confirmDelLinkId, setConfirmDelLinkId] = useState(null);
+  const [delLinkError,    setDelLinkError]    = useState("");
 
   const shortUrl = (code) => `${window.location.origin}/collect/${code}`;
 
@@ -295,8 +296,15 @@ export default function FieldSubmissions({ onUseData, user }) {
   };
 
   const deactivateLink = async (id) => {
-    try { await api.deleteFieldLink(id); setConfirmDelLinkId(null); await loadLinks(); }
-    catch (e) { alert("Failed: " + e.message); }
+    setDelLinkError("");
+    try {
+      await api.deleteFieldLink(id);
+      setConfirmDelLinkId(null);
+      setLinks(prev => prev.filter(l => l.id !== id));
+    } catch (e) {
+      setConfirmDelLinkId(null);
+      setDelLinkError("Delete failed: " + e.message);
+    }
   };
 
   const copyUrl = (code) => {
@@ -396,6 +404,12 @@ export default function FieldSubmissions({ onUseData, user }) {
           )}
 
           {/* Links list */}
+          {delLinkError && (
+            <div style={{ background: "rgba(220,38,38,0.25)", border: "1px solid #dc2626", borderRadius: 8, padding: "8px 14px", marginBottom: 10, fontSize: 12, color: "#fca5a5", display: "flex", justifyContent: "space-between" }}>
+              {delLinkError}
+              <button type="button" onClick={() => setDelLinkError("")} style={{ background: "none", border: "none", color: "#fca5a5", cursor: "pointer", fontWeight: 700 }}>✕</button>
+            </div>
+          )}
           {linksLoaded && links.length === 0 && !showLinkForm && (
             <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", fontStyle: "italic", textAlign: "center", padding: "8px 0" }}>
               No links yet. Click "+ New Link" to create one.
@@ -441,18 +455,18 @@ export default function FieldSubmissions({ onUseData, user }) {
                     </button>
                     {confirmDelLinkId === lnk.id ? (
                       <>
-                        <span style={{ fontSize: 11, color: "#ffcccc", alignSelf: "center" }}>Delete?</span>
-                        <button onClick={() => deactivateLink(lnk.id)}
-                          style={{ padding: "5px 12px", background: "#dc2626", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
-                          Yes
+                        <span style={{ fontSize: 11, color: "#ffcccc", alignSelf: "center" }}>Confirm?</span>
+                        <button type="button" onClick={() => deactivateLink(lnk.id)}
+                          style={{ padding: "5px 14px", background: "#dc2626", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                          Yes, Delete
                         </button>
-                        <button onClick={() => setConfirmDelLinkId(null)}
-                          style={{ padding: "5px 10px", background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12 }}>
-                          No
+                        <button type="button" onClick={() => setConfirmDelLinkId(null)}
+                          style={{ padding: "5px 10px", background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12 }}>
+                          Cancel
                         </button>
                       </>
                     ) : (
-                      <button onClick={() => setConfirmDelLinkId(lnk.id)}
+                      <button type="button" onClick={() => { setDelLinkError(""); setConfirmDelLinkId(lnk.id); }}
                         style={{ padding: "5px 12px", background: "rgba(200,0,0,0.35)", border: "none", borderRadius: 6, color: "#ffaaaa", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
                         🗑 Delete
                       </button>
