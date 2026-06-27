@@ -1853,19 +1853,83 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
   const deductFieldVisit = s.deductFieldVisit !== false; // default true
   const billingSystemLabel = s.billingSystemLabel || "Nepal Valuators Association Schedule";
   // Use company-configured tiers if provided via state, else fall back to built-in schedule
-  const valFee     = (() => {
+  // Also produce a human-readable breakdown of how the fee was calculated
+  const { valFee, valFeeBreakdown } = (() => {
+    const fmt = (n) => Math.round(n).toLocaleString("en-NP");
     const tiers = s.feeTiers;
-    if (!tiers || !Array.isArray(tiers) || tiers.length === 0) return calcValFee(finalFMV);
+    if (!tiers || !Array.isArray(tiers) || tiers.length === 0) {
+      // Built-in NVA schedule — show classic bracket table breakdown
+      const fee = calcValFee(finalFMV);
+      // Find which bracket applies
+      const nvaSlabs = [
+        [0,        2500000,   7500,      0],
+        [2500000,  5000000,   7500,      0.002],
+        [5000000,  10000000,  12500,     0.0015],
+        [10000000, 50000000,  20000,     0.001],
+        [50000000, 100000000, 60000,     0.0008],
+        [100000000,200000000, 100000,    0.0005],
+        [200000000,500000000, 150000,    0.0003],
+        [500000000,1000000000,240000,    0.0002],
+        [1000000000,Infinity, 340000,    0.0001],
+      ];
+      const fmv = finalFMV;
+      const steps = [];
+      if (fmv <= 0) { steps.push("FMV is 0 — no fee applicable."); }
+      else {
+        const slab = nvaSlabs.find(([lo,hi]) => fmv > lo && fmv <= hi) || nvaSlabs[nvaSlabs.length-1];
+        const [lo,hi,base,rate] = slab;
+        const diff = fmv - lo;
+        const inc  = Math.round(diff * rate);
+        steps.push(`FMV = NPR ${fmt(fmv)}`);
+        if (fmv <= 2500000) {
+          steps.push(`Slab: Up to NPR ${fmt(lo === 0 ? 2500000 : hi)}`);
+          steps.push(`Fee = NPR ${fmt(base)} (flat fee for this slab)`);
+        } else {
+          steps.push(`Slab: NPR ${fmt(lo)} – ${hi === Infinity ? "above" : "NPR "+fmt(hi)}`);
+          steps.push(`Base fee = NPR ${fmt(base)}`);
+          steps.push(`Incremental: (${fmt(fmv)} − ${fmt(lo)}) × ${(rate*100).toFixed(4)}% = NPR ${fmt(inc)}`);
+          steps.push(`Total fee = ${fmt(base)} + ${fmt(inc)} = NPR ${fmt(fee)}`);
+        }
+      }
+      return { valFee: fee, valFeeBreakdown: steps };
+    }
+    // Custom tiers
     const fmv = finalFMV;
-    if (fmv <= 0) return 0;
+    if (fmv <= 0) return { valFee: 0, valFeeBreakdown: ["FMV is 0 — no fee applicable."] };
     const floors = tiers.map((_, i) => i === 0 ? 0 : (tiers[i-1].upto == null ? Infinity : Number(tiers[i-1].upto)));
-    if (fmv <= Number(tiers[0].upto)) return Number(tiers[0].base) || 0;
+    const steps = [`FMV = NPR ${fmt(fmv)}`];
+    if (fmv <= Number(tiers[0].upto)) {
+      const fee = Number(tiers[0].base) || 0;
+      steps.push(`Slab: Up to NPR ${fmt(Number(tiers[0].upto))}${tiers[0].label ? " ("+tiers[0].label+")" : ""}`);
+      steps.push(`Fee = NPR ${fmt(fee)} (flat base fee)`);
+      return { valFee: fee, valFeeBreakdown: steps };
+    }
     for (let i = 1; i < tiers.length; i++) {
       const ceil = tiers[i].upto == null ? Infinity : Number(tiers[i].upto);
-      if (fmv <= ceil) return Math.round(Number(tiers[i].base) + (fmv - floors[i]) * Number(tiers[i].rate));
+      if (fmv <= ceil) {
+        const base = Number(tiers[i].base);
+        const rate = Number(tiers[i].rate);
+        const diff = fmv - floors[i];
+        const inc  = Math.round(diff * rate);
+        const fee  = Math.round(base + diff * rate);
+        steps.push(`Slab: NPR ${fmt(floors[i])} – ${ceil === Infinity ? "above" : "NPR "+fmt(ceil)}${tiers[i].label ? " ("+tiers[i].label+")" : ""}`);
+        steps.push(`Base fee = NPR ${fmt(base)}`);
+        steps.push(`Incremental: (${fmt(fmv)} − ${fmt(floors[i])}) × ${(rate*100).toFixed(4)}% = NPR ${fmt(inc)}`);
+        steps.push(`Total fee = ${fmt(base)} + ${fmt(inc)} = NPR ${fmt(fee)}`);
+        return { valFee: fee, valFeeBreakdown: steps };
+      }
     }
     const last = tiers[tiers.length - 1];
-    return Math.round(Number(last.base) + (fmv - floors[floors.length - 1]) * Number(last.rate));
+    const base = Number(last.base);
+    const rate = Number(last.rate);
+    const diff = fmv - floors[floors.length - 1];
+    const inc  = Math.round(diff * rate);
+    const fee  = Math.round(base + diff * rate);
+    steps.push(`Slab: NPR ${fmt(floors[floors.length-1])} and above${last.label ? " ("+last.label+")" : ""}`);
+    steps.push(`Base fee = NPR ${fmt(base)}`);
+    steps.push(`Incremental: (${fmt(fmv)} − ${fmt(floors[floors.length-1])}) × ${(rate*100).toFixed(4)}% = NPR ${fmt(inc)}`);
+    steps.push(`Total fee = ${fmt(base)} + ${fmt(inc)} = NPR ${fmt(fee)}`);
+    return { valFee: fee, valFeeBreakdown: steps };
   })();
   const extraAmt   = parseFloat(s.extraChargeAmount)    || 0;
   const subTotal   = fieldVisit + valFee + extraAmt;
@@ -2094,6 +2158,20 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
           </div>
         </div>`;
       })()}
+
+      <!-- Fee Calculation Breakdown -->
+      <div style="margin-bottom:6pt;background:#f8fafb;border:0.5pt solid #dde1e7;border-radius:4pt;padding:5pt 8pt">
+        <div style="font-size:7pt;font-weight:bold;color:${T.primary};text-transform:uppercase;letter-spacing:0.4px;border-bottom:0.5pt solid #ddd;padding-bottom:2pt;margin-bottom:4pt">
+          Valuation Fee Calculation — ${esc(billingSystemLabel)}
+        </div>
+        <table style="font-size:7.5pt;width:100%;border-collapse:collapse">
+          ${valFeeBreakdown.map((step, i) => `
+          <tr>
+            <td style="padding:1.5pt 3pt;color:#555;width:18pt;vertical-align:top">${i === 0 ? "" : "→"}</td>
+            <td style="padding:1.5pt 3pt;font-weight:${i === valFeeBreakdown.length - 1 ? "bold" : "400"};color:${i === valFeeBreakdown.length - 1 ? T.primary : "#333"}">${esc(step)}</td>
+          </tr>`).join("")}
+        </table>
+      </div>
 
       <!-- Fee Schedule Reference -->
       <div style="margin-bottom:5pt">
