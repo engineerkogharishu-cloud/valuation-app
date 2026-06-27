@@ -296,23 +296,105 @@ function StorageBar({ label, bytes, total, color }) {
 
 function StorageCard({ stats }) {
   const total = stats.total || 0;
-  const bd = stats.breakdown || {};
+  const bd    = stats.breakdown || {};
+  const files = stats.files || [];
+  const fields = stats.field_submissions || [];
+  const C2 = { navy: "#0f1f3d", border: "#dde1e7", muted: "#8a97aa" };
+
+  const fmtDate = (d) => d ? new Date(d.endsWith("Z") ? d : d + "Z").toLocaleDateString() : "—";
+
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #dde1e7", padding: "20px 24px", marginBottom: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div>
-          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "#0f1f3d" }}>💾 Storage Usage</h3>
-          <p style={{ margin: "3px 0 0", fontSize: 12, color: "#8a97aa" }}>{stats.report_count} reports · {stats.version_count} saved versions</p>
+    <div>
+      {/* Summary */}
+      <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C2.border}`, padding: "20px 24px", marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: C2.navy }}>💾 Storage Usage</h3>
+            <p style={{ margin: "3px 0 0", fontSize: 12, color: C2.muted }}>{stats.report_count} reports · {stats.version_count} saved versions</p>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 24, fontWeight: 900, color: C2.navy }}>{fmtBytes(total)}</div>
+            <div style={{ fontSize: 11, color: C2.muted }}>Total used</div>
+          </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 24, fontWeight: 900, color: "#0f1f3d" }}>{fmtBytes(total)}</div>
-          <div style={{ fontSize: 11, color: "#8a97aa" }}>Total used</div>
-        </div>
+        <StorageBar label="Reports (with photos)" bytes={bd.reports || 0}    total={total} color="#1a73e8" />
+        <StorageBar label="Version History"        bytes={bd.versions || 0}   total={total} color="#8e44ad" />
+        <StorageBar label="Letterhead Image"       bytes={bd.letterhead || 0} total={total} color="#27ae60" />
+        <StorageBar label="Field Submissions"      bytes={bd.field || 0}      total={total} color="#f39c12" />
       </div>
-      <StorageBar label="Reports (with photos)" bytes={bd.reports || 0}    total={total} color="#1a73e8" />
-      <StorageBar label="Version History"        bytes={bd.versions || 0}   total={total} color="#8e44ad" />
-      <StorageBar label="Letterhead Image"       bytes={bd.letterhead || 0} total={total} color="#27ae60" />
-      <StorageBar label="Field Submissions"      bytes={bd.field || 0}      total={total} color="#f39c12" />
+
+      {/* Per-report file table */}
+      {files.length > 0 && (
+        <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C2.border}`, overflow: "hidden", marginBottom: 16 }}>
+          <div style={{ padding: "12px 20px", borderBottom: `1px solid ${C2.border}`, fontWeight: 700, fontSize: 13, color: C2.navy }}>
+            📋 Report Files
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: "#f8fafc" }}>
+                  {["#", "File Name", "Report Data", "Versions", "Total Size", "Last Updated"].map(h => (
+                    <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontWeight: 700, color: C2.muted, textTransform: "uppercase", fontSize: 10, borderBottom: `1px solid ${C2.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {files.map((f, i) => (
+                  <tr key={f.id} style={{ borderBottom: `1px solid ${C2.border}`, background: i % 2 === 0 ? "#fff" : "#fafbfd" }}>
+                    <td style={{ padding: "8px 14px", color: C2.muted }}>{i + 1}</td>
+                    <td style={{ padding: "8px 14px", fontWeight: 600, color: C2.navy, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.filename}</td>
+                    <td style={{ padding: "8px 14px", color: "#1a73e8" }}>{fmtBytes(f.report_bytes)}</td>
+                    <td style={{ padding: "8px 14px", color: "#8e44ad" }}>{fmtBytes(f.version_bytes)}</td>
+                    <td style={{ padding: "8px 14px", fontWeight: 700, color: C2.navy }}>
+                      {fmtBytes(f.total)}
+                      <div style={{ background: "#e2e8f0", borderRadius: 3, height: 4, marginTop: 3, overflow: "hidden" }}>
+                        <div style={{ width: total > 0 ? Math.min(100, (f.total / total) * 100) + "%" : "0%", height: "100%", background: "#1a73e8", borderRadius: 3 }} />
+                      </div>
+                    </td>
+                    <td style={{ padding: "8px 14px", color: C2.muted }}>{fmtDate(f.updated_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Letterhead */}
+      {(bd.letterhead || 0) > 0 && (
+        <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C2.border}`, padding: "12px 20px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontWeight: 600, color: C2.navy }}>🖼️ Letterhead Image</span>
+          <span style={{ fontWeight: 700, color: "#27ae60" }}>{fmtBytes(bd.letterhead)}</span>
+        </div>
+      )}
+
+      {/* Field submissions */}
+      {fields.length > 0 && (
+        <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C2.border}`, overflow: "hidden" }}>
+          <div style={{ padding: "12px 20px", borderBottom: `1px solid ${C2.border}`, fontWeight: 700, fontSize: 13, color: C2.navy }}>
+            📱 Field Submissions
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                {["#", "Submitted By", "Size", "Date"].map(h => (
+                  <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontWeight: 700, color: C2.muted, textTransform: "uppercase", fontSize: 10, borderBottom: `1px solid ${C2.border}` }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {fields.map((f, i) => (
+                <tr key={f.id} style={{ borderBottom: `1px solid ${C2.border}`, background: i % 2 === 0 ? "#fff" : "#fafbfd" }}>
+                  <td style={{ padding: "8px 14px", color: C2.muted }}>{i + 1}</td>
+                  <td style={{ padding: "8px 14px", fontWeight: 600, color: C2.navy }}>{f.name}</td>
+                  <td style={{ padding: "8px 14px", color: "#f39c12", fontWeight: 700 }}>{fmtBytes(f.bytes)}</td>
+                  <td style={{ padding: "8px 14px", color: C2.muted }}>{fmtDate(f.date)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

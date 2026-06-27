@@ -2623,28 +2623,45 @@ app.get("/api/stats/billing", auth(["super_user", "admin"]), async (req, res) =>
 app.get("/api/stats/storage", auth(), async (req, res) => {
   try {
     const cc = req.user.companyCode;
-    const [reports, versions, company, fieldSubs] = await Promise.all([
-      dbAll("SELECT length(state_json) as sz FROM reports WHERE company_code=?", [cc]),
-      dbAll("SELECT length(state_json) as sz FROM report_versions WHERE company_code=?", [cc]),
+    const [reportRows, versionRows, company, fieldRows] = await Promise.all([
+      dbAll(`SELECT id, filename, created_at, updated_at,
+               length(state_json) as report_bytes
+             FROM reports WHERE company_code=? ORDER BY length(state_json) DESC`, [cc]),
+      dbAll(`SELECT report_id, length(state_json) as sz FROM report_versions WHERE company_code=?`, [cc]),
       dbGet("SELECT length(letterhead_png) as lh FROM companies WHERE company_code=?", [cc]),
-      dbAll("SELECT length(photos_json) as sz FROM field_submissions WHERE company_code=?", [cc]),
+      dbAll(`SELECT id, submitter_name, created_at, length(photos_json) as sz FROM field_submissions WHERE company_code=?`, [cc]),
     ]);
-    const sum = (rows) => rows.reduce((a, r) => a + (r.sz || 0), 0);
-    const reportsBytes   = sum(reports);
-    const versionsBytes  = sum(versions);
+
+    // Build per-version map: report_id -> total version bytes
+    const versionMap = {};
+    for (const v of versionRows) {
+      versionMap[v.report_id] = (versionMap[v.report_id] || 0) + (v.sz || 0);
+    }
+
+    const files = reportRows.map(r => ({
+      id:           r.id,
+      filename:     r.filename || `Report #${r.id}`,
+      report_bytes: r.report_bytes || 0,
+      version_bytes: versionMap[r.id] || 0,
+      total:        (r.report_bytes || 0) + (versionMap[r.id] || 0),
+      updated_at:   r.updated_at || r.created_at,
+    }));
+
+    const sum = (arr, key) => arr.reduce((a, r) => a + (r[key] || 0), 0);
     const letterheadBytes = company?.lh || 0;
-    const fieldBytes     = sum(fieldSubs);
-    const totalBytes     = reportsBytes + versionsBytes + letterheadBytes + fieldBytes;
+    const fieldBytes      = sum(fieldRows, "sz");
+    const reportsBytes    = sum(files, "report_bytes");
+    const versionsBytes   = sum(files, "version_bytes");
+    const totalBytes      = reportsBytes + versionsBytes + letterheadBytes + fieldBytes;
+
     res.json({
       total: totalBytes,
-      breakdown: {
-        reports:    reportsBytes,
-        versions:   versionsBytes,
-        letterhead: letterheadBytes,
-        field:      fieldBytes,
-      },
-      report_count:  reports.length,
-      version_count: versions.length,
+      breakdown: { reports: reportsBytes, versions: versionsBytes, letterhead: letterheadBytes, field: fieldBytes },
+      report_count:  files.length,
+      version_count: versionRows.length,
+      files,
+      letterhead_bytes: letterheadBytes,
+      field_submissions: fieldRows.map(f => ({ id: f.id, name: f.submitter_name || `Submission #${f.id}`, bytes: f.sz || 0, date: f.created_at })),
     });
   } catch (err) { handleError(res, err, "GET /api/stats/storage"); }
 });
