@@ -250,10 +250,10 @@ function MissingDocumentPanel({ clients, owners, hasBuilding, properties }) {
 }
 
 // ── Field Charge Dialog ───────────────────────────────────────────────────────
-function FieldChargeDialog({ onConfirm, onCancel }) {
-  const [received, setReceived] = React.useState(null);
-  const [amount, setAmount]     = React.useState("");
-  const [transport, setTransport] = React.useState("");
+function FieldChargeDialog({ onConfirm, onCancel, initialReceived, initialAmount, initialTransport }) {
+  const [received, setReceived] = React.useState(initialReceived ?? true);
+  const [amount, setAmount]     = React.useState(initialAmount || "3000");
+  const [transport, setTransport] = React.useState(initialTransport || "");
 
   const canProceed = received !== null;
 
@@ -494,6 +494,9 @@ export default function ReportSection({
       {/* ── Field Charge Dialog ── */}
       {showFieldDialog && (
         <FieldChargeDialog
+          initialReceived={fieldChargeReceived}
+          initialAmount={fieldChargeAmount}
+          initialTransport={transportationCharge}
           onConfirm={(received, amount, transport) => {
             setFieldChargeReceived(received);
             setFieldChargeAmount(amount);

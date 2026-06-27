@@ -216,7 +216,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
   const [includeLimitingConditions, setIncludeLimitingConditions] = useState(false);
   // Bill fields
   const [fieldChargeReceived, setFieldChargeReceived] = useState(null); // null=unanswered, true, false
-  const [fieldChargeAmount, setFieldChargeAmount]     = useState("");    // NPR
+  const [fieldChargeAmount, setFieldChargeAmount]     = useState("3000"); // NPR — default Rs 3000
   const [transportationCharge, setTransportationCharge] = useState("");  // NPR
   const [billNo, setBillNo]                           = useState("");    // auto or manual
   const [includeVat, setIncludeVat]                   = useState(false); // 13% VAT
