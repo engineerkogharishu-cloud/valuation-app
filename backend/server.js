@@ -478,18 +478,37 @@ async function purgeOldSecurityEvents() {
   } catch (_) {}
 }
 
-async function pruneReportVersions() {
+const MAX_VERSIONS_PER_REPORT = 10;
+
+async function pruneReportVersions(reportId = null) {
   try {
-    await db.execute(`
-      DELETE FROM report_versions
-      WHERE id IN (
-        SELECT rv.id FROM report_versions rv
-        WHERE (
-          SELECT COUNT(*) FROM report_versions rv2
-          WHERE rv2.report_id = rv.report_id AND rv2.id > rv.id
-        ) >= 20
-      )
-    `);
+    // If a specific report, prune only that one (called after each save)
+    // Otherwise prune all (called at startup)
+    if (reportId) {
+      await dbRun(`
+        DELETE FROM report_versions
+        WHERE report_id = ? AND id NOT IN (
+          SELECT id FROM report_versions
+          WHERE report_id = ?
+          ORDER BY id DESC
+          LIMIT ${MAX_VERSIONS_PER_REPORT}
+        )
+      `, [reportId, reportId]);
+    } else {
+      // Startup: prune all reports in one pass
+      const reportIds = await dbAll("SELECT DISTINCT report_id FROM report_versions");
+      for (const { report_id } of reportIds) {
+        await dbRun(`
+          DELETE FROM report_versions
+          WHERE report_id = ? AND id NOT IN (
+            SELECT id FROM report_versions
+            WHERE report_id = ?
+            ORDER BY id DESC
+            LIMIT ${MAX_VERSIONS_PER_REPORT}
+          )
+        `, [report_id, report_id]);
+      }
+    }
   } catch (_) {}
 }
 
@@ -1329,6 +1348,7 @@ app.put("/api/reports/:id", auth(), express.json({ limit: "50mb" }), async (req,
       `INSERT INTO report_versions (report_id, changed_by_id, state_json, state_hash) VALUES (?, ?, ?, ?)`,
       [existing.id, req.user.userId, existing.state_json, stateHash]
     );
+    pruneReportVersions(existing.id); // keep only last 10 — fire and forget
 
     const sanitized = deepSanitize(state);
     const meta = extractMeta(sanitized);
