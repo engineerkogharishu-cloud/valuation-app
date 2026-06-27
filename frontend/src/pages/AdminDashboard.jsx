@@ -723,6 +723,7 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
     ["payment",    "💳", "Payment Methods"],
     ["feetiers",   "📐", "Fee Tiers"],
     ["billing",    "🧾", "Billing"],
+    ["storage",    "💾", "Storage"],
     ["field",      "📱", "Field Data"],
     ["reports",    "📊", "Report Analytics"],
     ["ratemap",    "🗺️", "Rate Map"],
@@ -1554,9 +1555,6 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
               ))}
             </div>
 
-            {/* Storage card */}
-            {storageStats && <StorageCard stats={storageStats} />}
-
             {/* Per-report table */}
             <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden" }}>
               <div style={{ padding: "16px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1610,6 +1608,17 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════
+            TAB: STORAGE
+        ══════════════════════════════════════════ */}
+        {tab === "storage" && (
+          <div>
+            {storageStats
+              ? <StorageCard stats={storageStats} />
+              : <div style={{ textAlign: "center", padding: 40, color: "#8a97aa" }}>Loading storage data…</div>}
           </div>
         )}
 
