@@ -159,6 +159,7 @@ export default function FieldSubmissions({ onUseData, user }) {
   const [genLoading,   setGenLoading]   = useState(false);
   const [copiedId,     setCopiedId]     = useState(null);
   const [showQrId,     setShowQrId]     = useState(null);
+  const [confirmDelLinkId, setConfirmDelLinkId] = useState(null);
 
   const shortUrl = (code) => `${window.location.origin}/collect/${code}`;
 
@@ -294,8 +295,7 @@ export default function FieldSubmissions({ onUseData, user }) {
   };
 
   const deactivateLink = async (id) => {
-    if (!window.confirm("Deactivate this link? Field staff using it will no longer be able to submit.")) return;
-    try { await api.deleteFieldLink(id); await loadLinks(); }
+    try { await api.deleteFieldLink(id); setConfirmDelLinkId(null); await loadLinks(); }
     catch (e) { alert("Failed: " + e.message); }
   };
 
@@ -439,10 +439,24 @@ export default function FieldSubmissions({ onUseData, user }) {
                       style={{ padding: "5px 10px", background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12 }}>
                       QR
                     </button>
-                    <button onClick={() => deactivateLink(lnk.id)}
-                      style={{ padding: "5px 10px", background: "rgba(200,0,0,0.35)", border: "none", borderRadius: 6, color: "#ffaaaa", cursor: "pointer", fontSize: 12 }}>
-                      ✕
-                    </button>
+                    {confirmDelLinkId === lnk.id ? (
+                      <>
+                        <span style={{ fontSize: 11, color: "#ffcccc", alignSelf: "center" }}>Delete?</span>
+                        <button onClick={() => deactivateLink(lnk.id)}
+                          style={{ padding: "5px 12px", background: "#dc2626", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                          Yes
+                        </button>
+                        <button onClick={() => setConfirmDelLinkId(null)}
+                          style={{ padding: "5px 10px", background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontSize: 12 }}>
+                          No
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={() => setConfirmDelLinkId(lnk.id)}
+                        style={{ padding: "5px 12px", background: "rgba(200,0,0,0.35)", border: "none", borderRadius: 6, color: "#ffaaaa", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+                        🗑 Delete
+                      </button>
+                    )}
                   </div>
                 </div>
                 {/* QR panel */}

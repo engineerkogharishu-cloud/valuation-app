@@ -1160,6 +1160,10 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                           onClick={() => openModal("editUser", u)}
                           style={{ background: "#f0f4ff", color: C.blue, border: "none", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                         >Edit</button>
+                        <button
+                          onClick={() => openModal("deleteUser", u)}
+                          style={{ background: "#fff0f0", color: C.danger, border: `1px solid ${C.danger}44`, borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                        >Delete</button>
                       </div>
                     </td>
                   </tr>
