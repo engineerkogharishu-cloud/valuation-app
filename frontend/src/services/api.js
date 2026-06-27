@@ -228,4 +228,8 @@ export const api = {
   // Super Admin broadcast email
   broadcastEmail: (subject, html, target = "all") =>
     request("/admin/email/broadcast", { method: "POST", body: JSON.stringify({ subject, html, target }) }),
+
+  // Super Admin test email
+  testEmail: (to) =>
+    request("/admin/email/test", { method: "POST", body: JSON.stringify({ to }) }),
 };

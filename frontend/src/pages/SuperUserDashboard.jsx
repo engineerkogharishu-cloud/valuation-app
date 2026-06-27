@@ -732,11 +732,25 @@ function RateMapAccessAdmin({ companies }) {
 
 // ── Mass / Broadcast Email ────────────────────────────────────
 function BroadcastEmail({ companies }) {
-  const [subject, setSubject] = useState("");
-  const [body, setBody]       = useState("");
-  const [target, setTarget]   = useState("all");
-  const [sending, setSending] = useState(false);
-  const [result, setResult]   = useState(null);
+  const [subject, setSubject]   = useState("");
+  const [body, setBody]         = useState("");
+  const [target, setTarget]     = useState("all");
+  const [sending, setSending]   = useState(false);
+  const [result, setResult]     = useState(null);
+  const [testTo, setTestTo]     = useState("");
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult]   = useState(null);
+
+  const sendTest = async () => {
+    if (!testTo.trim()) return alert("Enter an email address to test.");
+    setTestSending(true); setTestResult(null);
+    try {
+      const d = await api.testEmail(testTo.trim());
+      setTestResult({ ok: true, msg: "✅ " + d.message });
+    } catch (e) {
+      setTestResult({ ok: false, msg: "❌ " + e.message });
+    } finally { setTestSending(false); }
+  };
 
   const send = async () => {
     if (!subject.trim() || !body.trim()) return alert("Subject and message are required.");
@@ -765,6 +779,27 @@ function BroadcastEmail({ companies }) {
   const C2 = { navy: "#0f1f3d", border: "#dde1e7", muted: "#8a97aa" };
   return (
     <div style={{ maxWidth: 720 }}>
+
+      {/* ── Test Email Card ── */}
+      <div style={{ background: "#fff", borderRadius: 12, border: `1.5px solid #86efac`, padding: "20px 24px", marginBottom: 20 }}>
+        <h3 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 800, color: "#166534" }}>🧪 Test Email Configuration</h3>
+        <p style={{ margin: "0 0 14px", fontSize: 12, color: C2.muted }}>Send a test email to verify Resend is configured correctly.</p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <input type="email" value={testTo} onChange={e => setTestTo(e.target.value)}
+            placeholder="Enter your email to receive test..."
+            style={{ flex: 1, padding: "9px 12px", border: `1.5px solid ${C2.border}`, borderRadius: 8, fontSize: 13 }} />
+          <button onClick={sendTest} disabled={testSending}
+            style={{ padding: "9px 20px", background: "#166534", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: testSending ? "not-allowed" : "pointer", whiteSpace: "nowrap", opacity: testSending ? 0.7 : 1 }}>
+            {testSending ? "Sending…" : "Send Test"}
+          </button>
+        </div>
+        {testResult && (
+          <div style={{ marginTop: 10, padding: "8px 14px", borderRadius: 7, background: testResult.ok ? "#f0fdf4" : "#fff5f5", border: `1px solid ${testResult.ok ? "#86efac" : "#fca5a5"}`, color: testResult.ok ? "#166534" : "#c0392b", fontSize: 13, fontWeight: 600 }}>
+            {testResult.msg}
+          </div>
+        )}
+      </div>
+
       <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C2.border}`, padding: "24px 28px", marginBottom: 20 }}>
         <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: C2.navy }}>📧 Mass Email Broadcast</h2>
         <p style={{ margin: "0 0 20px", fontSize: 13, color: C2.muted }}>Send a message to all registered companies or a specific one.</p>

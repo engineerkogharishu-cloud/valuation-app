@@ -1934,6 +1934,33 @@ async function sendCreditsAssignedEmail(toEmail, contactName, companyName, credi
   }
 }
 
+// ── Test email (super admin only) ─────────────────────────────────────────────
+app.post("/api/admin/email/test", auth(["super_user"]), express.json(), async (req, res) => {
+  try {
+    const { to } = req.body;
+    if (!to) return res.status(400).json({ error: "to email is required" });
+    if (!mailer) return res.status(503).json({ error: "Email not configured — set RESEND_API_KEY in Railway environment variables" });
+    await mailer.sendMail({
+      from: emailFrom(),
+      to,
+      subject: "✅ Test Email — One Degree Consultant Valuation System",
+      html: `<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:500px;margin:0 auto;padding:32px;background:#f9fafb;border-radius:12px;border:1px solid #e0e4ea">
+        <div style="font-size:40px;text-align:center;margin-bottom:16px">✅</div>
+        <h2 style="text-align:center;color:#0f1f3d;margin:0 0 12px">Email System Working!</h2>
+        <p style="color:#4a5568;text-align:center;font-size:14px;line-height:1.7">
+          This is a test email from <strong>One Degree Consultant Pvt. Ltd.</strong> Valuation System.<br/>
+          If you received this, your email configuration is correct.
+        </p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0"/>
+        <p style="font-size:11px;color:#aaa;text-align:center">Sent from: ${emailFrom()}</p>
+      </div>`,
+    });
+    res.json({ message: "Test email sent to " + to });
+  } catch (err) {
+    res.status(500).json({ error: "Failed: " + (err.message || String(err)) });
+  }
+});
+
 // ── Mass email (super admin broadcast) ────────────────────────────────────────
 app.post("/api/admin/email/broadcast", auth(["super_user"]), express.json(), async (req, res) => {
   try {
