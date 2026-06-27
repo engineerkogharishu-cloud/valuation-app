@@ -188,6 +188,29 @@ export default function MobileCollectPage({ token, shortCode }) {
   // ── Building ──────────────────────────────────────────────
   const [hasBuilding, setHasBuilding] = useState(null); // null=unset, "yes"|"yes_not_valuing"|"no"
   const [building, setBuilding] = useState({ numFloors: "", structureType: "", foundationType: "", faceDirection: "", totalAreaSqft: "", remarks: "" });
+  const RCC_DEFAULTS = {
+    minColumn: "12×12 inch", minBeam: "9×12 inch", dpcTieBeam: "4 inch DPC / 9×9 inch Tie Beam", slabThickness: "5 inch",
+    externalWall: "9 inch brick masonry in cement mortar (1:6)", internalWall: "4.5 inch brick masonry in cement mortar (1:4)",
+    doorMaterial: "Wood", windowMaterial: "Wood",
+    staircase: "RCC slab type staircase", roof: "RCC flat roof with waterproofing and top floor Roof Light gauge structure",
+    externalFinishing: "2-coat cement plaster with weather coat/snowcem paint",
+    internalFinishing: "2-coat cement plaster with emulsion/distemper paint",
+    ceiling: "Cement plaster with emulsion paint",
+    flooring: "Ceramic tiles", verandah: "Ceramic tiles", kitchen: "Ceramic tiles",
+    bathroom: "Ceramic tiles, EWC, wash basin, shower",
+    sanitary: "PPR pipe with EWC, wash basin, shower",
+    electricitySystem: "Single phase NEA connection",
+    ugWaterTank: "Available", ohWaterTank: "Available", solarPanel: "Not Available",
+    waterSupply: "KUKL/Municipality water supply", deepBoring: "Not Available",
+    sewerage: "Septic tank", lift: "Not Available", generator: "Not Available",
+    parking: "Available — 150 sq ft", compoundWall: "Available",
+    buildingPermit: "Available", nbcCompliance: "Yes", setback: "Maintained",
+    defects: "None observed. The building is in good structural condition with no visible cracks, dampness, settlement, tilting or spalling.",
+    repairMaintenance: "None required at present. The building is well-maintained and in good overall condition.",
+    comments: "The building is structurally sound and in good overall condition. Construction quality is satisfactory.",
+  };
+  const [specs, setSpecs] = useState({ ...RCC_DEFAULTS });
+  const setSpec = (k) => (e) => setSpecs(s => ({ ...s, [k]: e.target.value }));
   const setB = (k) => (e) => setBuilding(b => ({ ...b, [k]: e.target.value }));
 
   // ── Hazards ───────────────────────────────────────────────
@@ -241,7 +264,7 @@ export default function MobileCollectPage({ token, shortCode }) {
       traceSheets: Object.fromEntries(plotNos.filter(p => p.no.trim()).map(p => [p.no.trim(), p.traceSheet])),
       area,
       roads: roads.filter(r => r.type || r.width || r.side),
-      building: hasBuilding === "yes" ? { ...building, present: true } : { present: false, status: hasBuilding },
+      building: hasBuilding === "yes" ? { ...building, present: true, specs } : { present: false, status: hasBuilding },
       hazards,
     },
     photos,
@@ -277,7 +300,7 @@ export default function MobileCollectPage({ token, shortCode }) {
     setPlotNos([{ no: "", traceSheet: "" }]);
     setArea({ r: "", a: "", p: "", d: "" });
     setRoads([{ ...EMPTY_ROAD }]);
-    setHasBuilding(null); setBuilding({ numFloors: "", structureType: "", foundationType: "", faceDirection: "", totalAreaSqft: "", remarks: "" });
+    setHasBuilding(null); setBuilding({ numFloors: "", structureType: "", foundationType: "", faceDirection: "", totalAreaSqft: "", remarks: "" }); setSpecs({ ...RCC_DEFAULTS });
     setHazards(EMPTY_HAZARDS); setPhotos([]); setSubmitted(false); setSubmitError("");
   };
 
@@ -531,6 +554,94 @@ export default function MobileCollectPage({ token, shortCode }) {
               <FL label="Building Remarks">
                 <textarea style={{ ...S.input, height: 70, resize: "vertical" }} value={building.remarks} onChange={setB("remarks")} placeholder="Condition, defects, observations…" />
               </FL>
+
+              {/* Technical Specifications */}
+              <div style={{ marginTop: 18, borderTop: "1.5px solid #e0e7ef", paddingTop: 14 }}>
+                <div style={{ fontWeight: 700, color: "#0f1f3d", fontSize: 13, marginBottom: 12, letterSpacing: 0.2 }}>📐 Technical Specifications</div>
+
+                <div style={{ fontWeight: 600, color: "#555", fontSize: 11, textTransform: "uppercase", marginBottom: 6 }}>Structure</div>
+                {[
+                  ["minColumn",    "Minimum Column Size",   ["12×12 inch","9×9 inch","10×10 inch","14×14 inch"]],
+                  ["minBeam",      "Minimum Beam Size",     ["9×12 inch","9×9 inch","9×15 inch","12×12 inch"]],
+                  ["dpcTieBeam",   "DPC / Tie Beam",        ["4 inch DPC / 9×9 inch Tie Beam","6 inch DPC / 9×9 inch Tie Beam","4 inch DPC only"]],
+                  ["slabThickness","Slab Thickness",        ["5 inch","4 inch","6 inch"]],
+                ].map(([k, label, opts]) => (
+                  <FL key={k} label={label}>
+                    <EditableSelect style={S} value={specs[k]} onChange={setSpec(k)} options={opts} />
+                  </FL>
+                ))}
+
+                <div style={{ fontWeight: 600, color: "#555", fontSize: 11, textTransform: "uppercase", margin: "12px 0 6px" }}>Walls, Doors & Windows</div>
+                {[
+                  ["externalWall",  "External Wall",    ["9 inch brick masonry in cement mortar (1:6)","9 inch brick masonry in cement mortar (1:4)","Stone masonry in cement mortar"]],
+                  ["internalWall",  "Internal Wall",    ["4.5 inch brick masonry in cement mortar (1:4)","4.5 inch brick masonry in cement mortar (1:6)","Lightweight partition wall"]],
+                  ["doorMaterial",  "Doors",            ["Wood","Aluminum","UPVC"]],
+                  ["windowMaterial","Windows",          ["Wood","Aluminum","UPVC"]],
+                  ["staircase",     "Staircase",        ["RCC slab type staircase","Timber staircase","Marble staircase","Steel staircase"]],
+                  ["roof",          "Roof",             ["RCC flat roof with waterproofing and top floor Roof Light gauge structure","RCC flat roof with waterproofing","CGI sheet roofing","Timber roof with CGI sheet"]],
+                ].map(([k, label, opts]) => (
+                  <FL key={k} label={label}>
+                    <EditableSelect style={S} value={specs[k]} onChange={setSpec(k)} options={opts} />
+                  </FL>
+                ))}
+
+                <div style={{ fontWeight: 600, color: "#555", fontSize: 11, textTransform: "uppercase", margin: "12px 0 6px" }}>Finishing & Fixtures</div>
+                {[
+                  ["externalFinishing","External Finishing",["2-coat cement plaster with weather coat/snowcem paint","3-coat cement plaster with weather coat paint","Exposed brick finish","Stone cladding"]],
+                  ["internalFinishing","Internal Finishing",["2-coat cement plaster with emulsion/distemper paint","3-coat cement plaster with emulsion paint","POP finish with paint"]],
+                  ["ceiling",         "Ceiling",           ["Cement plaster with emulsion paint","POP (Plaster of Paris) with paint","False ceiling (gypsum board)","Exposed RCC","Wooden ceiling"]],
+                  ["flooring",        "Flooring",          ["Ceramic tiles","Vitrified tiles","Marble","Granite","Mosaic","Cement screed"]],
+                  ["verandah",        "Verandah",          ["Ceramic tiles","Vitrified tiles","Marble","Granite","Cement screed","Not Applicable"]],
+                  ["kitchen",         "Kitchen / Dining",  ["Ceramic tiles","Vitrified tiles","Granite","Marble"]],
+                  ["bathroom",        "Bathroom / Toilet", ["Ceramic tiles, EWC, wash basin, shower","Ceramic tiles, Indian WC","Vitrified tiles, EWC, wash basin, shower","Ceramic tiles, EWC, wash basin, shower, bathtub"]],
+                ].map(([k, label, opts]) => (
+                  <FL key={k} label={label}>
+                    <EditableSelect style={S} value={specs[k]} onChange={setSpec(k)} options={opts} />
+                  </FL>
+                ))}
+
+                <div style={{ fontWeight: 600, color: "#555", fontSize: 11, textTransform: "uppercase", margin: "12px 0 6px" }}>Services & Utilities</div>
+                {[
+                  ["sanitary",         "Sanitary & Plumbing",   ["PPR pipe with EWC, wash basin, shower","CPVC pipe with EWC, wash basin, shower","GI pipe with EWC, wash basin","PVC pipe"]],
+                  ["electricitySystem","Electricity System",    ["Single phase NEA connection","Three phase NEA connection","Solar only","NEA + Solar backup"]],
+                  ["ugWaterTank",      "Underground Water Tank",["Available","Not Available"]],
+                  ["ohWaterTank",      "Overhead Water Tank",   ["Available","Not Available"]],
+                  ["solarPanel",       "Solar Panel",           ["Not Available","Available"]],
+                  ["waterSupply",      "Water Supply",          ["KUKL/Municipality water supply","Borewell / deep boring","Water tanker","Stream/spring water"]],
+                  ["deepBoring",       "Deep Boring",           ["Not Available","Available"]],
+                  ["sewerage",         "Sewerage System",       ["Septic tank","Connected to municipality","Not Available"]],
+                  ["lift",             "Lift / Elevator",       ["Not Available","Available"]],
+                  ["generator",        "Generator / Backup",    ["Not Available","Available"]],
+                ].map(([k, label, opts]) => (
+                  <FL key={k} label={label}>
+                    <EditableSelect style={S} value={specs[k]} onChange={setSpec(k)} options={opts} />
+                  </FL>
+                ))}
+
+                <div style={{ fontWeight: 600, color: "#555", fontSize: 11, textTransform: "uppercase", margin: "12px 0 6px" }}>Compliance & Amenities</div>
+                {[
+                  ["buildingPermit","Building Permit",    ["Available","Not Available","Under Process"]],
+                  ["nbcCompliance", "NBC Code Compliance",["Yes","No","Partially"]],
+                  ["setback",       "Setback Maintained", ["Maintained","Not Maintained","Partially Maintained"]],
+                  ["compoundWall",  "Compound Wall",      ["Available","Not Available"]],
+                  ["parking",       "Parking",            ["Available — 150 sq ft","Available — 200 sq ft","Available — Basement","Available — Open","Not Available","Other"]],
+                ].map(([k, label, opts]) => (
+                  <FL key={k} label={label}>
+                    <EditableSelect style={S} value={specs[k]} onChange={setSpec(k)} options={opts} />
+                  </FL>
+                ))}
+
+                <div style={{ fontWeight: 600, color: "#555", fontSize: 11, textTransform: "uppercase", margin: "12px 0 6px" }}>Condition & Remarks</div>
+                <FL label="Defects / Observations">
+                  <textarea style={{ ...S.input, height: 70, resize: "vertical" }} value={specs.defects} onChange={setSpec("defects")} placeholder="Visible defects, cracks, dampness…" />
+                </FL>
+                <FL label="Repair & Maintenance">
+                  <textarea style={{ ...S.input, height: 60, resize: "vertical" }} value={specs.repairMaintenance} onChange={setSpec("repairMaintenance")} placeholder="Required or recent maintenance…" />
+                </FL>
+                <FL label="Comments">
+                  <textarea style={{ ...S.input, height: 60, resize: "vertical" }} value={specs.comments} onChange={setSpec("comments")} placeholder="Additional comments…" />
+                </FL>
+              </div>
             </div>
           )}
         </Section>
@@ -619,6 +730,17 @@ function OfflineBanner({ pendingCount }) {
       <span style={{ fontSize:18 }}>📴</span>
       <span style={{ flex:1 }}>Offline — data saved locally, sent when reconnected.{pendingCount > 0 && <strong> ({pendingCount} queued)</strong>}</span>
     </div>
+  );
+}
+
+// Editable combobox: shows preset options but value is a free-text input
+function EditableSelect({ value, onChange, options, style }) {
+  const id = React.useId();
+  return (
+    <>
+      <datalist id={id}>{options.map(o => <option key={o} value={o} />)}</datalist>
+      <input style={style.input} list={id} value={value} onChange={onChange} />
+    </>
   );
 }
 
