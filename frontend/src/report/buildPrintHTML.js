@@ -2006,7 +2006,7 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
 
       <!-- Intro paragraph -->
       <div style="font-size:8pt;line-height:1.45;margin-bottom:5pt;color:#222">
-        We are pleased to quote the rates of Valuation charge as per agreement with <strong>${esc(s.bank||"[Bank Name]")}${s.branch?" — "+esc(s.branch):""}</strong>.
+        We are pleased to quote the rates of Valuation charge as per agreement with <strong>${s.billingSystem === "bank" ? esc(s.bank||"[Bank Name]")+(s.branch?" — "+esc(s.branch):"") : "Nepal Valuators Association"}</strong>.
         Please find the valuation charge sheet as per your requirement.
       </div>
 
