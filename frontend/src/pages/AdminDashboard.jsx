@@ -1414,7 +1414,7 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr>
-                          {["#", "Label", "Up To FMV (NPR)", "Base Fee (NPR)", "Rate (%)", "Actions"].map(h => (
+                          {["#", "Label", "Up To FMV (NPR)", "Base Fee (NPR)", "Rate (0.000 format)", "Actions"].map(h => (
                             <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", borderBottom: `1px solid ${C.border}`, background: "#fafbfc", whiteSpace: "nowrap" }}>{h}</th>
                           ))}
                         </tr>
@@ -1426,12 +1426,12 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                             <td style={{ padding: "10px 16px", fontWeight: 600, color: C.navy }}>{t.label}</td>
                             <td style={{ padding: "10px 16px", color: C.text }}>{t.upto === null || t.upto === "" ? <em style={{ color: C.muted }}>No limit (last tier)</em> : Number(t.upto).toLocaleString("en-NP")}</td>
                             <td style={{ padding: "10px 16px", color: C.text }}>{Number(t.base || 0).toLocaleString("en-NP")}</td>
-                            <td style={{ padding: "10px 16px", color: C.text }}>{(Number(t.rate || 0) * 100).toFixed(4).replace(/\.?0+$/, "")}%</td>
+                            <td style={{ padding: "10px 16px", color: C.text }}>{Number(t.rate || 0).toFixed(4)}</td>
                             <td style={{ padding: "10px 16px" }}>
                               <div style={{ display: "flex", gap: 6 }}>
                                 <button onClick={() => moveTier(feeTierBank, i, -1)} disabled={i === 0} style={{ padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: 5, background: "#fff", cursor: i === 0 ? "not-allowed" : "pointer", fontSize: 12, opacity: i === 0 ? 0.4 : 1 }}>↑</button>
                                 <button onClick={() => moveTier(feeTierBank, i, 1)} disabled={i === activeTiers.length - 1} style={{ padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: 5, background: "#fff", cursor: i === activeTiers.length - 1 ? "not-allowed" : "pointer", fontSize: 12, opacity: i === activeTiers.length - 1 ? 0.4 : 1 }}>↓</button>
-                                <button onClick={() => setEditingTier({ label: t.label, upto: t.upto === null ? "" : String(t.upto), base: String(t.base || ""), rate: String((Number(t.rate || 0) * 100).toFixed(4).replace(/\.?0+$/, "")), _idx: i, _bank: feeTierBank })}
+                                <button onClick={() => setEditingTier({ label: t.label, upto: t.upto === null ? "" : String(t.upto), base: String(t.base || ""), rate: String(Number(t.rate || 0).toFixed(4)), _idx: i, _bank: feeTierBank })}
                                   style={{ padding: "4px 10px", border: `1px solid ${C.border}`, borderRadius: 5, background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>✏ Edit</button>
                                 <button onClick={() => removeTier(feeTierBank, i)} style={{ padding: "4px 10px", border: "1px solid #fca5a5", borderRadius: 5, background: "#fff5f5", color: "#e74c3c", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>✕</button>
                               </div>
@@ -1458,7 +1458,7 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                       { key: "label", label: "Label", placeholder: "e.g. 25L – 50L", type: "text" },
                       { key: "upto",  label: "Up To FMV (NPR) — leave blank for last tier", placeholder: "e.g. 5000000", type: "number" },
                       { key: "base",  label: "Base Fee (NPR)", placeholder: "e.g. 7500", type: "number" },
-                      { key: "rate",  label: "Rate (%) — e.g. 0.20 for 0.20%", placeholder: "e.g. 0.20", type: "number" },
+                      { key: "rate",  label: "Rate (decimal) — e.g. 0.0020 for 0.20%", placeholder: "e.g. 0.0020", type: "number" },
                     ].map(({ key, label, placeholder, type }) => (
                       <div key={key} style={{ marginBottom: 14 }}>
                         <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", marginBottom: 5 }}>{label}</label>
