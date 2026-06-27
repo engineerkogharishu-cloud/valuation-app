@@ -319,6 +319,13 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
   const [valuatorMsg, setValuatorMsg]     = useState("");
   const [editingValuator, setEditingValuator] = useState(null); // null | valuator object
 
+  // Fee tier management
+  const emptyTier = () => ({ label: "", upto: "", base: "", rate: "" });
+  const [feeTierList, setFeeTierList]   = useState([]);
+  const [feeTierSaving, setFeeTierSaving] = useState(false);
+  const [feeTierMsg, setFeeTierMsg]     = useState("");
+  const [editingTier, setEditingTier]   = useState(null); // null | tier object with _idx
+
   const [modal, setModal] = useState(null);
   const [target, setTarget] = useState(null);
   const [form, setForm] = useState({});
@@ -390,6 +397,11 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
     catch (e) { console.error(e); }
   }, []);
 
+  const loadFeeTiers = useCallback(async () => {
+    try { const d = await api.getCompanyFeeTiers(); setFeeTierList(d.fee_tiers || []); }
+    catch (e) { console.error(e); }
+  }, []);
+
   const loadBillingStats = useCallback(async () => {
     setBillingLoading(true);
     try { setBillingStats(await api.getBillingStats()); }
@@ -397,7 +409,7 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
     finally { setBillingLoading(false); }
   }, []);
 
-  useEffect(() => { loadUsers(); loadProfile(); loadBanks(); loadValuators(); loadPaymentMethods(); loadCredits(); loadBillingStats(); loadRejectedSubmissions(); }, [loadUsers, loadProfile, loadBanks, loadValuators, loadPaymentMethods, loadCredits, loadBillingStats, loadRejectedSubmissions]);
+  useEffect(() => { loadUsers(); loadProfile(); loadBanks(); loadValuators(); loadPaymentMethods(); loadFeeTiers(); loadCredits(); loadBillingStats(); loadRejectedSubmissions(); }, [loadUsers, loadProfile, loadBanks, loadValuators, loadPaymentMethods, loadFeeTiers, loadCredits, loadBillingStats, loadRejectedSubmissions]);
   useEffect(() => { if (tab === "reports") { loadStats(); loadReports(reportSearch); loadRejectedSubmissions(); } }, [tab]); // mount-only per tab switch
 
   // ── Bank list helpers ─────────────────────────────────────
@@ -459,6 +471,40 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
   };
 
   const removeValuator = (id) => saveValuators(valuatorList.filter(v => v.id !== id));
+
+  // ── Fee tier helpers ──────────────────────────────────────────
+  const saveFeeTiers = async (list) => {
+    setFeeTierSaving(true); setFeeTierMsg("");
+    try {
+      const payload = list.map(t => ({ ...t, upto: t.upto === "" || t.upto === null ? null : Number(t.upto) }));
+      const d = await api.updateCompanyFeeTiers(payload);
+      setFeeTierList(d.fee_tiers);
+      setFeeTierMsg("✓ Fee tiers saved.");
+      setTimeout(() => setFeeTierMsg(""), 3000);
+    } catch (e) {
+      setFeeTierMsg("Error: " + e.message);
+    } finally {
+      setFeeTierSaving(false);
+    }
+  };
+
+  const saveEditingTier = () => {
+    if (!editingTier || !editingTier.label.trim()) return;
+    const updated = editingTier._isNew
+      ? [...feeTierList, { label: editingTier.label, upto: editingTier.upto, base: editingTier.base, rate: editingTier.rate }]
+      : feeTierList.map((t, i) => i === editingTier._idx ? { label: editingTier.label, upto: editingTier.upto, base: editingTier.base, rate: editingTier.rate } : t);
+    setEditingTier(null);
+    saveFeeTiers(updated);
+  };
+
+  const removeTier = (idx) => saveFeeTiers(feeTierList.filter((_, i) => i !== idx));
+  const moveTier = (idx, dir) => {
+    const l = [...feeTierList];
+    const j = idx + dir;
+    if (j < 0 || j >= l.length) return;
+    [l[idx], l[j]] = [l[j], l[idx]];
+    saveFeeTiers(l);
+  };
 
   // ── Payment method helpers ────────────────────────────────────
   const savePaymentMethods = async (list) => {
@@ -611,6 +657,7 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
     ["valuators",  "👷", "Valuators"],
     ["banks",      "🏦", "Bank List"],
     ["payment",    "💳", "Payment Methods"],
+    ["feetiers",   "📐", "Fee Tiers"],
     ["billing",    "🧾", "Billing"],
     ["field",      "📱", "Field Data"],
     ["reports",    "📊", "Report Analytics"],
@@ -1293,6 +1340,106 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                   </div>
                 </div>
               </Modal>
+            )}
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════
+            TAB: FEE TIERS
+        ══════════════════════════════════════════ */}
+        {tab === "feetiers" && (
+          <div>
+            <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 24 }}>
+              <div style={{ padding: "16px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.navy }}>📐 Valuation Fee Tiers</h3>
+                  <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted }}>Configure the fee schedule used to calculate valuation charges on bills. Each tier defines the charge for a range of Fair Market Value (FMV).</p>
+                </div>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                  {feeTierMsg && <span style={{ fontSize: 13, fontWeight: 600, color: feeTierMsg.startsWith("✓") ? C.success : "#e74c3c" }}>{feeTierMsg}</span>}
+                  <button
+                    onClick={() => setEditingTier({ ...emptyTier(), _isNew: true })}
+                    style={{ padding: "8px 18px", background: GRAD.navy, color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                    + Add Tier
+                  </button>
+                </div>
+              </div>
+
+              {/* Tier table */}
+              {feeTierList.length === 0 ? (
+                <div style={{ padding: "48px 24px", textAlign: "center", color: C.muted, fontSize: 14 }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>📐</div>
+                  <p style={{ margin: 0, fontWeight: 600, color: C.text2 }}>No custom fee tiers configured</p>
+                  <p style={{ margin: "6px 0 0", fontSize: 12 }}>Using the default NRB schedule. Add tiers above to override.</p>
+                </div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr>
+                        {["#", "Label", "Up To (NPR)", "Base Fee (NPR)", "Rate (%)", "Actions"].map(h => (
+                          <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", borderBottom: `1px solid ${C.border}`, background: "#fafbfc", whiteSpace: "nowrap" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {feeTierList.map((t, i) => (
+                        <tr key={i} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? "#fff" : "#fafbfd" }}>
+                          <td style={{ padding: "10px 16px", color: C.muted, fontWeight: 600 }}>{i + 1}</td>
+                          <td style={{ padding: "10px 16px", fontWeight: 600, color: C.navy }}>{t.label}</td>
+                          <td style={{ padding: "10px 16px", color: C.text }}>{t.upto === null || t.upto === "" ? <em style={{ color: C.muted }}>No limit</em> : Number(t.upto).toLocaleString("en-NP")}</td>
+                          <td style={{ padding: "10px 16px", color: C.text }}>{Number(t.base || 0).toLocaleString("en-NP")}</td>
+                          <td style={{ padding: "10px 16px", color: C.text }}>{Number(t.rate || 0) * 100}%</td>
+                          <td style={{ padding: "10px 16px" }}>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button onClick={() => moveTier(i, -1)} disabled={i === 0} style={{ padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: 5, background: "#fff", cursor: "pointer", fontSize: 12 }}>↑</button>
+                              <button onClick={() => moveTier(i, 1)} disabled={i === feeTierList.length - 1} style={{ padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: 5, background: "#fff", cursor: "pointer", fontSize: 12 }}>↓</button>
+                              <button onClick={() => setEditingTier({ ...t, upto: t.upto === null ? "" : t.upto, base: String(t.base || ""), rate: String((Number(t.rate || 0) * 100).toFixed(4)), _idx: i })}
+                                style={{ padding: "4px 10px", border: `1px solid ${C.border}`, borderRadius: 5, background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>✏ Edit</button>
+                              <button onClick={() => removeTier(i)} style={{ padding: "4px 10px", border: "1px solid #fca5a5", borderRadius: 5, background: "#fff5f5", color: "#e74c3c", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>✕</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div style={{ padding: "12px 24px", borderTop: `1px solid ${C.border}`, background: "#f9f9f9", fontSize: 12, color: C.muted }}>
+                <strong>How it works:</strong> Tiers are applied in order. The first tier's base fee is a flat minimum. For each subsequent tier, fee = Base + (FMV − previous tier's upper limit) × Rate. Leave "Up To" blank for the last (open-ended) tier.
+              </div>
+            </div>
+
+            {/* Edit / Add tier modal */}
+            {editingTier && (
+              <div style={{ position: "fixed", inset: 0, background: "rgba(15,31,61,0.65)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9500 }}>
+                <div style={{ background: "#fff", borderRadius: 16, padding: "28px 30px", width: "96%", maxWidth: 440, boxShadow: "0 24px 64px rgba(0,0,0,0.3)" }}>
+                  <h3 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: C.navy }}>{editingTier._isNew ? "Add Fee Tier" : "Edit Fee Tier"}</h3>
+                  {[
+                    { key: "label", label: "Label", placeholder: "e.g. 25L – 50L", type: "text" },
+                    { key: "upto",  label: "Up To FMV (NPR) — leave blank for no limit", placeholder: "e.g. 5000000", type: "number" },
+                    { key: "base",  label: "Base Fee (NPR)", placeholder: "e.g. 7500", type: "number" },
+                    { key: "rate",  label: "Rate (%)", placeholder: "e.g. 0.20 (for 0.20%)", type: "number" },
+                  ].map(({ key, label, placeholder, type }) => (
+                    <div key={key} style={{ marginBottom: 14 }}>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", marginBottom: 5 }}>{label}</label>
+                      <input
+                        type={type} value={editingTier[key]} placeholder={placeholder}
+                        onChange={e => setEditingTier(t => ({ ...t, [key]: e.target.value }))}
+                        style={{ width: "100%", padding: "9px 12px", border: `1.5px solid ${C.border}`, borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
+                      />
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end" }}>
+                    <button onClick={() => setEditingTier(null)} style={{ padding: "9px 20px", border: `1.5px solid ${C.border}`, borderRadius: 8, background: "#fff", color: "#555", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                    <button onClick={saveEditingTier} disabled={!editingTier.label.trim()}
+                      style={{ padding: "9px 22px", background: editingTier.label.trim() ? GRAD.navy : "#ccc", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: editingTier.label.trim() ? "pointer" : "not-allowed" }}>
+                      {feeTierSaving ? "Saving…" : "Save Tier"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}

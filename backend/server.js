@@ -352,6 +352,8 @@ async function initDb() {
     "ALTER TABLE companies ADD COLUMN bill_prefix TEXT DEFAULT 'BILL'",
     // Payment methods (bank accounts with QR for bill)
     "ALTER TABLE companies ADD COLUMN payment_methods TEXT DEFAULT '[]'",
+    // Valuation fee tiers (NRB schedule, configurable per company)
+    "ALTER TABLE companies ADD COLUMN fee_tiers TEXT DEFAULT '[]'",
     // Field links (short codes for mobile data collection)
     `CREATE TABLE IF NOT EXISTS field_links (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1050,6 +1052,40 @@ app.put("/api/company/valuators", auth(["admin", "super_user"]), async (req, res
     res.json({ valuators: clean, message: "Valuator list updated" });
   } catch (err) {
     handleError(res, err, "PUT /api/company/valuators");
+  }
+});
+
+// ── Company Fee Tiers ─────────────────────────────────────────────────────────
+
+app.get("/api/company/fee-tiers", auth(), async (req, res) => {
+  try {
+    const company = await dbGet("SELECT fee_tiers FROM companies WHERE company_code=?", [req.user.companyCode]);
+    if (!company) return res.status(404).json({ error: "Company not found" });
+    let tiers = [];
+    try { tiers = JSON.parse(company.fee_tiers || "[]"); } catch (_) {}
+    res.json({ fee_tiers: tiers });
+  } catch (err) {
+    handleError(res, err, "GET /api/company/fee-tiers");
+  }
+});
+
+app.put("/api/company/fee-tiers", auth(["admin", "super_user"]), async (req, res) => {
+  try {
+    const { fee_tiers } = req.body;
+    if (!Array.isArray(fee_tiers)) return res.status(400).json({ error: "fee_tiers must be an array" });
+    const clean = fee_tiers.map(t => ({
+      label:    String(t.label    || "").trim(),
+      upto:     t.upto === null || t.upto === "" ? null : Number(t.upto),
+      base:     Number(t.base     || 0),
+      rate:     Number(t.rate     || 0),
+    })).filter(t => t.label);
+    await dbRun(
+      "UPDATE companies SET fee_tiers=?, updated_at=CURRENT_TIMESTAMP WHERE company_code=?",
+      [JSON.stringify(clean), req.user.companyCode]
+    );
+    res.json({ fee_tiers: clean, message: "Fee tiers updated" });
+  } catch (err) {
+    handleError(res, err, "PUT /api/company/fee-tiers");
   }
 });
 

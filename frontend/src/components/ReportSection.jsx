@@ -8,7 +8,7 @@ import { usePrintCredit } from "./ui/CreditBadge";
 import { toWords } from "../utils/numberWords";
 
 // ── Valuation fee tiers (NRB/financial institution schedule) ──────────────────
-const FEE_TIERS = [
+export const DEFAULT_FEE_TIERS = [
   { upto: 2_500_000,       base: 0,          rate: 0,      label: "Up to 25 Lakh" },
   { upto: 5_000_000,       base: 7_500,       rate: 0.0020, label: "25L – 50L" },
   { upto: 10_000_000,      base: 12_500,      rate: 0.0015, label: "50L – 1Cr" },
@@ -19,19 +19,31 @@ const FEE_TIERS = [
   { upto: 1_000_000_000,   base: 240_000,     rate: 0.0002, label: "50Cr – 100Cr" },
   { upto: Infinity,        base: 340_000,     rate: 0.0001, label: "Above 100Cr" },
 ];
-const TIER_FLOORS = [0, 2_500_000, 5_000_000, 10_000_000, 50_000_000, 100_000_000, 200_000_000, 500_000_000, 1_000_000_000];
 
-export function calcValuationFee(fmv) {
-  if (!fmv || fmv <= 0) return 0;
-  // flat minimum
-  if (fmv <= 2_500_000) return 7_500;
-  for (let i = 1; i < FEE_TIERS.length; i++) {
-    if (fmv <= FEE_TIERS[i].upto) {
-      return Math.round(FEE_TIERS[i].base + (fmv - TIER_FLOORS[i]) * FEE_TIERS[i].rate);
+// Compute tier floors from the tiers array (floor of tier i = upto of tier i-1)
+function getTierFloors(tiers) {
+  return tiers.map((_, i) => (i === 0 ? 0 : (tiers[i - 1].upto === null ? Infinity : tiers[i - 1].upto)));
+}
+
+export function calcValuationFeeWithTiers(fmv, tiers) {
+  if (!fmv || fmv <= 0 || !tiers || tiers.length === 0) return 0;
+  const floors = getTierFloors(tiers);
+  // First tier is flat minimum
+  if (fmv <= tiers[0].upto) return tiers[0].base || 0;
+  for (let i = 1; i < tiers.length; i++) {
+    const ceiling = tiers[i].upto === null ? Infinity : tiers[i].upto;
+    if (fmv <= ceiling) {
+      return Math.round(tiers[i].base + (fmv - floors[i]) * tiers[i].rate);
     }
   }
-  // above 100Cr
-  return Math.round(340_000 + (fmv - 1_000_000_000) * 0.0001);
+  // Beyond last tier — use last tier's formula
+  const last = tiers[tiers.length - 1];
+  const lastFloor = floors[floors.length - 1];
+  return Math.round(last.base + (fmv - lastFloor) * last.rate);
+}
+
+export function calcValuationFee(fmv) {
+  return calcValuationFeeWithTiers(fmv, DEFAULT_FEE_TIERS);
 }
 
 // ── Missing Document Checklist ────────────────────────────────────────────────
@@ -249,15 +261,20 @@ export default function ReportSection({
   const [showFieldDialog, setShowFieldDialog] = React.useState(false);
   const [paymentMethods, setPaymentMethods] = React.useState([]);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = React.useState("");
+  const [feeTiers, setFeeTiers] = React.useState(DEFAULT_FEE_TIERS);
   const { requestPrint, ConfirmDialog, creditData } = usePrintCredit(reportId);
 
-  const valuationFee = calcValuationFee(finalFMV || 0);
+  const valuationFee = calcValuationFeeWithTiers(finalFMV || 0, feeTiers);
 
   React.useEffect(() => {
     api.getCompanyPaymentMethods().then(d => {
       const methods = d.payment_methods || [];
       setPaymentMethods(methods);
       if (methods.length && !selectedPaymentMethodId) setSelectedPaymentMethodId(methods[0].id);
+    }).catch(() => {});
+    api.getCompanyFeeTiers().then(d => {
+      const tiers = d.fee_tiers || [];
+      if (tiers.length > 0) setFeeTiers(tiers.map(t => ({ ...t, upto: t.upto === null ? Infinity : t.upto })));
     }).catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -68,6 +68,12 @@ export const api = {
   updateCompanyPaymentMethods: (payment_methods) =>
     request("/company/payment-methods", { method: "PUT", body: JSON.stringify({ payment_methods }) }),
 
+  // ── Company Fee Tiers ─────────────────────────────────────
+  getCompanyFeeTiers: () => request("/company/fee-tiers"),
+
+  updateCompanyFeeTiers: (fee_tiers) =>
+    request("/company/fee-tiers", { method: "PUT", body: JSON.stringify({ fee_tiers }) }),
+
   // ── Company Valuators ─────────────────────────────────────
   getCompanyValuators: () => request("/company/valuators"),
 
