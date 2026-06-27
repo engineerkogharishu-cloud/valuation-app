@@ -1851,6 +1851,7 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
   const transport  = parseFloat(s.transportationCharge) || 0;
   const fieldVisit = fieldFee + transport;
   const deductFieldVisit = s.deductFieldVisit !== false; // default true
+  const billingSystemLabel = s.billingSystemLabel || "Nepal Valuators Association Schedule";
   // Use company-configured tiers if provided via state, else fall back to built-in schedule
   const valFee     = (() => {
     const tiers = s.feeTiers;
@@ -2026,7 +2027,7 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
           </tr>
           <tr style="background:${T.info};-webkit-print-color-adjust:exact;print-color-adjust:exact">
             <td style="padding:3pt 6pt;border:0.5pt solid #ddd">2.</td>
-            <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:bold">Valuation Charge (NRB Schedule)${extraAmt>0?`<br/><span style="font-size:7.5pt;font-weight:normal;color:#555">&nbsp;&nbsp;+ ${esc(s.extraChargeLabel||"Extra Charge")}: ${npr(extraAmt)}</span>`:""}</td>
+            <td style="padding:3pt 6pt;border:0.5pt solid #ddd;font-weight:bold">Valuation Charge<br/><span style="font-size:7.5pt;font-weight:normal;color:#555">${esc(billingSystemLabel)}</span>${extraAmt>0?`<br/><span style="font-size:7.5pt;font-weight:normal;color:#555">&nbsp;&nbsp;+ ${esc(s.extraChargeLabel||"Extra Charge")}: ${npr(extraAmt)}</span>`:""}</td>
             <td style="padding:3pt 6pt;border:0.5pt solid #ddd;text-align:right;font-weight:bold;color:${T.primary}">${npr(valFee + extraAmt)}</td>
           </tr>
           <tr style="background:#fff8e1;font-weight:bold;-webkit-print-color-adjust:exact;print-color-adjust:exact">
@@ -2094,10 +2095,10 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
         </div>`;
       })()}
 
-      <!-- NRB Fee Schedule -->
+      <!-- Fee Schedule Reference -->
       <div style="margin-bottom:5pt">
         <div style="font-size:7pt;font-weight:bold;color:${T.primary};text-transform:uppercase;letter-spacing:0.4px;border-bottom:0.5pt solid #ccc;padding-bottom:1.5pt;margin-bottom:3pt">
-          Reference: New Valuation Fee Schedule for Financial Institutions
+          Reference: ${esc(billingSystemLabel)}
         </div>
         <table style="font-size:7pt">
           <thead>

@@ -340,6 +340,7 @@ export default function ReportSection({
   extraChargeLabel, setExtraChargeLabel, extraChargeAmount, setExtraChargeAmount,
   discountAmount, setDiscountAmount,
   deductFieldVisit, setDeductFieldVisit,
+  billingSystem, setBillingSystem,
   billQrCode, setBillQrCode,
   amountReceived, setAmountReceived,
   finalFMV,
@@ -356,16 +357,19 @@ export default function ReportSection({
   const [feeTiersMap, setFeeTiersMap] = React.useState({});
   const { requestPrint, ConfirmDialog, creditData } = usePrintCredit(reportId);
 
-  // Resolve which tiers apply: bank-specific → "Default" → built-in NRB schedule
-  const resolvedTiers = React.useMemo(() => {
+  // Resolve which tiers apply based on selected billing system
+  const { resolvedTiers, billingSystemLabel } = React.useMemo(() => {
     const normalize = (list) => list.map(t => ({ ...t, upto: t.upto === null ? Infinity : t.upto }));
-    const bankKey = bank || "";
-    if (feeTiersMap[bankKey] && feeTiersMap[bankKey].length > 0)
-      return normalize(feeTiersMap[bankKey]);
-    if (feeTiersMap["Default"] && feeTiersMap["Default"].length > 0)
-      return normalize(feeTiersMap["Default"]);
-    return DEFAULT_FEE_TIERS;
-  }, [feeTiersMap, bank]);
+    if (billingSystem === "bank") {
+      const bankKey = bank || "";
+      if (feeTiersMap[bankKey] && feeTiersMap[bankKey].length > 0)
+        return { resolvedTiers: normalize(feeTiersMap[bankKey]), billingSystemLabel: `${bankKey} Schedule` };
+      if (feeTiersMap["Default"] && feeTiersMap["Default"].length > 0)
+        return { resolvedTiers: normalize(feeTiersMap["Default"]), billingSystemLabel: "Default Bank Schedule" };
+    }
+    // "nva" or fallback — always use built-in NVA schedule
+    return { resolvedTiers: DEFAULT_FEE_TIERS, billingSystemLabel: "Nepal Valuators Association Schedule" };
+  }, [feeTiersMap, bank, billingSystem]);
 
   const valuationFee = calcValuationFeeWithTiers(finalFMV || 0, resolvedTiers);
 
@@ -403,7 +407,7 @@ export default function ReportSection({
     showToast("⏳ Generating bill preview…");
     try {
       const selectedPM = paymentMethods.find(m => m.id === selectedPaymentMethodId) || null;
-      const state = { ...collectState(), finalFMV: finalFMV || 0, billQrCode: billQrCode || "", selectedPaymentMethod: selectedPM, feeTiers: resolvedTiers, deductFieldVisit };
+      const state = { ...collectState(), finalFMV: finalFMV || 0, billQrCode: billQrCode || "", selectedPaymentMethod: selectedPM, feeTiers: resolvedTiers, deductFieldVisit, billingSystemLabel };
       await fetchLetterhead(state);
       const full = buildPrintHTML(state, getFileName("pdf"), false, {});
       setFullHtml(full);
@@ -676,6 +680,26 @@ export default function ReportSection({
               <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>Click "Print / Download Bill" to generate PDF</span>
             </div>
 
+            {/* Billing system selector */}
+            <div style={{ padding: "10px 18px", borderBottom: "1px solid #f0f0f0", background: "#f8fafb", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: C2.navy, marginRight: 4 }}>Fee Schedule:</span>
+              {[
+                { value: "nva", label: "Nepal Valuators Association" },
+                { value: "bank", label: bank ? `${bank} (Bank)` : "Bank Schedule" },
+              ].map(opt => (
+                <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: billingSystem === opt.value ? 700 : 400, cursor: "pointer",
+                  padding: "5px 12px", borderRadius: 20, border: `1.5px solid ${billingSystem === opt.value ? C2.navy : "#dde1e7"}`,
+                  background: billingSystem === opt.value ? C2.navy : "#fff", color: billingSystem === opt.value ? "#fff" : C2.navy, transition: "all 0.15s" }}>
+                  <input type="radio" name="billingSystem" value={opt.value} checked={billingSystem === opt.value}
+                    onChange={() => setBillingSystem(opt.value)} style={{ display: "none" }} />
+                  {opt.label}
+                </label>
+              ))}
+              <span style={{ fontSize: 11, color: C2.muted, marginLeft: 4 }}>
+                — Applied: <em>{billingSystemLabel}</em>
+              </span>
+            </div>
+
             {/* Bill inputs */}
             <div style={{ padding: "14px 18px", borderBottom: "1px solid #eee", display: "flex", gap: 12, flexWrap: "wrap" }}>
               <div style={{ flex: "1 1 180px" }}>
@@ -779,7 +803,7 @@ export default function ReportSection({
                 In Words: <strong style={{ color: C2.navy }}>{toWords(grandTotal)} Rupees Only</strong>
               </div>
               <div style={{ padding: "0 14px 10px", fontSize: 11, color: C2.muted }}>
-                ✓ Fee calculated per NRB Valuation Fee Schedule for Financial Institutions
+                ✓ Fee calculated per {billingSystemLabel}
               </div>
             </div>
           </div>
