@@ -1850,6 +1850,7 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
   const fieldFee   = parseFloat(s.fieldChargeAmount)    || 0;
   const transport  = parseFloat(s.transportationCharge) || 0;
   const fieldVisit = fieldFee + transport;
+  const deductFieldVisit = s.deductFieldVisit !== false; // default true
   // Use company-configured tiers if provided via state, else fall back to built-in schedule
   const valFee     = (() => {
     const tiers = s.feeTiers;
@@ -1867,7 +1868,7 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
   })();
   const extraAmt   = parseFloat(s.extraChargeAmount)    || 0;
   const subTotal   = fieldVisit + valFee + extraAmt;
-  const advance    = fieldVisit; // field charge is recorded as advance
+  const advance    = deductFieldVisit ? fieldVisit : 0;
   const total      = subTotal - advance;
   const discount   = parseFloat(s.discountAmount)       || 0;
   const vatBase    = Math.max(0, total - discount);
@@ -2033,29 +2034,32 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
             <td style="padding:3pt 6pt;border:0.5pt solid #ddd">Sub Total</td>
             <td style="padding:3pt 6pt;border:0.5pt solid #ddd;text-align:right">${npr(subTotal)}</td>
           </tr>
-          <tr style="background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+          ${deductFieldVisit?`<tr style="background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact">
             <td style="padding:3pt 6pt;border:0.5pt solid #ddd">4.</td>
-            <td style="padding:3pt 6pt;border:0.5pt solid #ddd">Advance</td>
+            <td style="padding:3pt 6pt;border:0.5pt solid #ddd">Advance (Field Visit)</td>
             <td style="padding:3pt 6pt;border:0.5pt solid #ddd;text-align:right;color:#c0392b">− ${npr(advance)}</td>
-          </tr>
-          <tr style="background:${T.info};font-weight:bold;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-            <td style="padding:3pt 6pt;border:0.5pt solid #ddd">5.</td>
+          </tr>`:""}
+          ${(()=>{
+            let n = deductFieldVisit ? 4 : 3;
+            return `<tr style="background:${T.info};font-weight:bold;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+            <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${++n}.</td>
             <td style="padding:3pt 6pt;border:0.5pt solid #ddd">Total</td>
             <td style="padding:3pt 6pt;border:0.5pt solid #ddd;text-align:right">${npr(total)}</td>
           </tr>
           <tr style="background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-            <td style="padding:3pt 6pt;border:0.5pt solid #ddd">6.</td>
+            <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${++n}.</td>
             <td style="padding:3pt 6pt;border:0.5pt solid #ddd">Discount</td>
             <td style="padding:3pt 6pt;border:0.5pt solid #ddd;text-align:right;color:#c0392b">− ${npr(discount)}</td>
           </tr>
           ${vatAmt>0?`<tr style="background:${T.info};-webkit-print-color-adjust:exact;print-color-adjust:exact">
-            <td style="padding:3pt 6pt;border:0.5pt solid #ddd">7.</td>
+            <td style="padding:3pt 6pt;border:0.5pt solid #ddd">${++n}.</td>
             <td style="padding:3pt 6pt;border:0.5pt solid #ddd">VAT @ 13%</td>
             <td style="padding:3pt 6pt;border:0.5pt solid #ddd;text-align:right;color:#e67e22">${npr(vatAmt)}</td>
           </tr>`:""}
           <tr style="background:${T.lighter};border-top:1.5pt solid ${T.primary};-webkit-print-color-adjust:exact;print-color-adjust:exact">
-            <td style="padding:4pt 6pt;font-weight:bold;border:0.5pt solid #ccc">${vatAmt>0?"8.":"7."}</td>
-            <td style="padding:4pt 6pt;font-weight:bold;border:0.5pt solid #ccc">Grand Total Payable</td>
+            <td style="padding:4pt 6pt;font-weight:bold;border:0.5pt solid #ccc">${++n}.</td>
+            <td style="padding:4pt 6pt;font-weight:bold;border:0.5pt solid #ccc">Grand Total Payable</td>`;
+          })()}
             <td style="padding:4pt 6pt;font-weight:bold;font-size:10pt;text-align:right;color:${T.primary};border:0.5pt solid #ccc">${npr(grandTotal)}</td>
           </tr>
         </tbody>

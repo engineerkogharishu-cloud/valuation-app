@@ -339,6 +339,7 @@ export default function ReportSection({
   billNo, setBillNo, includeVat, setIncludeVat, billRemarks, setBillRemarks,
   extraChargeLabel, setExtraChargeLabel, extraChargeAmount, setExtraChargeAmount,
   discountAmount, setDiscountAmount,
+  deductFieldVisit, setDeductFieldVisit,
   billQrCode, setBillQrCode,
   amountReceived, setAmountReceived,
   finalFMV,
@@ -402,7 +403,7 @@ export default function ReportSection({
     showToast("⏳ Generating bill preview…");
     try {
       const selectedPM = paymentMethods.find(m => m.id === selectedPaymentMethodId) || null;
-      const state = { ...collectState(), finalFMV: finalFMV || 0, billQrCode: billQrCode || "", selectedPaymentMethod: selectedPM, feeTiers: resolvedTiers };
+      const state = { ...collectState(), finalFMV: finalFMV || 0, billQrCode: billQrCode || "", selectedPaymentMethod: selectedPM, feeTiers: resolvedTiers, deductFieldVisit };
       await fetchLetterhead(state);
       const full = buildPrintHTML(state, getFileName("pdf"), false, {});
       setFullHtml(full);
@@ -655,7 +656,7 @@ export default function ReportSection({
         const fieldVisit  = fieldAmt + transAmt;
         const extraAmt    = Number(extraChargeAmount)    || 0;
         const subTotal    = fieldVisit + valuationFee + extraAmt;
-        const advanceAmt  = fieldVisit; // field charge is recorded as advance
+        const advanceAmt  = deductFieldVisit ? fieldVisit : 0;
         const total       = subTotal - advanceAmt;
         const discAmt     = Number(discountAmount)       || 0;
         const vatBase     = Math.max(0, total - discAmt);
@@ -744,6 +745,13 @@ export default function ReportSection({
                   Include VAT (13%)
                 </label>
               </div>
+
+              <div style={{ display: "flex", alignItems: "flex-end", paddingBottom: 2 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, cursor: "pointer", color: deductFieldVisit ? "#e67e22" : C2.navy }}>
+                  <input type="checkbox" checked={deductFieldVisit} onChange={e => setDeductFieldVisit(e.target.checked)} style={{ width: 15, height: 15, accentColor: "#e67e22" }} />
+                  Deduct Field Visit as Advance
+                </label>
+              </div>
             </div>
 
             {/* Fee table — new structure */}
@@ -755,11 +763,16 @@ export default function ReportSection({
                   <Row label="2. Valuation Charge (NRB Schedule)" value={npr(valuationFee)} bold color="#1a5c3a" />
                   {extraAmt > 0 && <Row label={`   ${extraChargeLabel || "Extra Charge"}`} value={npr(extraAmt)} />}
                   <Row label="3. Sub Total" value={npr(subTotal)} highlight />
-                  <Row label="4. Advance" value={`− ${npr(advanceAmt)}`} color="#e67e22" />
-                  <Row label="5. Total" value={npr(total)} bold />
-                  <Row label="6. Discount" value={`− ${npr(discAmt)}`} color="#e74c3c" />
-                  {vatAmt > 0 && <Row label="7. VAT @ 13%" value={npr(vatAmt)} color="#e67e22" />}
-                  <Row label={`${vatAmt > 0 ? "8" : "7"}. Grand Total Payable`} value={npr(grandTotal)} total />
+                  {deductFieldVisit && <Row label="4. Advance (Field Visit)" value={`− ${npr(advanceAmt)}`} color="#e67e22" />}
+                  {(() => {
+                    let n = 4;
+                    return <>
+                      <Row label={`${deductFieldVisit ? ++n : n}. Total`} value={npr(total)} bold />
+                      <Row label={`${++n}. Discount`} value={`− ${npr(discAmt)}`} color="#e74c3c" />
+                      {vatAmt > 0 && <Row label={`${++n}. VAT @ 13%`} value={npr(vatAmt)} color="#e67e22" />}
+                      <Row label={`${++n}. Grand Total Payable`} value={npr(grandTotal)} total />
+                    </>;
+                  })()}
                 </tbody>
               </table>
               <div style={{ padding: "6px 14px 10px", fontSize: 11, color: C2.muted, fontStyle: "italic" }}>

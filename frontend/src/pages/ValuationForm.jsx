@@ -224,6 +224,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
   const [extraChargeLabel, setExtraChargeLabel]       = useState("");    // custom bill line item heading
   const [extraChargeAmount, setExtraChargeAmount]     = useState("");    // custom bill line item amount
   const [discountAmount, setDiscountAmount]           = useState("");    // discount on bill
+  const [deductFieldVisit, setDeductFieldVisit]       = useState(true);  // deduct field visit as advance on bill
   const [billQrCode, setBillQrCode]                   = useState("");    // payment QR code data URL
   const [amountReceived, setAmountReceived]           = useState("");    // advance / amount received from client
   // Final report extra fields
@@ -514,7 +515,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
     propDescriptions, photos, sitePlans, legalDocs, valuatorInfo,
     buildingDetails,
     fieldChargeReceived, fieldChargeAmount, transportationCharge,
-    billNo, includeVat, billRemarks, extraChargeLabel, extraChargeAmount, discountAmount, billQrCode, amountReceived,
+    billNo, includeVat, billRemarks, extraChargeLabel, extraChargeAmount, discountAmount, deductFieldVisit, billQrCode, amountReceived,
     finalFMV: finalFMVRef.current,
     // letterheadHtml and letterheadTextBox are intentionally excluded here.
     // They are stored in the company profile (DB) and always fetched fresh
@@ -522,7 +523,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
     // in every report snapshot and prevent the super admin's changes from
     // taking effect on existing reports.
     customBanks,
-  }), [bank, branch, visitDate, reportDate, reportType, clients, owners, isBuySell, properties, buildings, hasBuilding, mortgagedIds, areaMeasured, deductions, rates, plotRateSplits, access, roadAccess, buildingVals, extraBoundaryRows, commercialPct, distressPct, govValues, remarks, limitingConditions, includeLimitingConditions, propDescriptions, photos, sitePlans, legalDocs, valuatorInfo, buildingDetails, customBanks, fieldChargeReceived, fieldChargeAmount, transportationCharge, billNo, includeVat, billRemarks, extraChargeLabel, extraChargeAmount, discountAmount, billQrCode, amountReceived]);
+  }), [bank, branch, visitDate, reportDate, reportType, clients, owners, isBuySell, properties, buildings, hasBuilding, mortgagedIds, areaMeasured, deductions, rates, plotRateSplits, access, roadAccess, buildingVals, extraBoundaryRows, commercialPct, distressPct, govValues, remarks, limitingConditions, includeLimitingConditions, propDescriptions, photos, sitePlans, legalDocs, valuatorInfo, buildingDetails, customBanks, fieldChargeReceived, fieldChargeAmount, transportationCharge, billNo, includeVat, billRemarks, extraChargeLabel, extraChargeAmount, discountAmount, deductFieldVisit, billQrCode, amountReceived]);
 
   const handleSaveToDb = React.useCallback(async () => {
     setDbSaving(true);
@@ -705,6 +706,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
       if (d.extraChargeLabel !== undefined) setExtraChargeLabel(d.extraChargeLabel || "");
       if (d.extraChargeAmount !== undefined) setExtraChargeAmount(d.extraChargeAmount || "");
       if (d.discountAmount !== undefined) setDiscountAmount(d.discountAmount || "");
+      if (d.deductFieldVisit !== undefined) setDeductFieldVisit(d.deductFieldVisit !== false);
       if (d.billQrCode !== undefined) setBillQrCode(d.billQrCode || "");
       if (d.amountReceived !== undefined) setAmountReceived(d.amountReceived || "");
       if(d.letterheadHtml !== undefined) { /* letterhead now comes from server, not saved state */ }
@@ -3653,6 +3655,8 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
           setExtraChargeAmount={setExtraChargeAmount}
           discountAmount={discountAmount}
           setDiscountAmount={setDiscountAmount}
+          deductFieldVisit={deductFieldVisit}
+          setDeductFieldVisit={setDeductFieldVisit}
           billQrCode={billQrCode}
           setBillQrCode={setBillQrCode}
           amountReceived={amountReceived}
