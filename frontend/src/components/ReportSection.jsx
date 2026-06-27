@@ -34,6 +34,121 @@ export function calcValuationFee(fmv) {
   return Math.round(340_000 + (fmv - 1_000_000_000) * 0.0001);
 }
 
+// ── Missing Document Checklist ────────────────────────────────────────────────
+const DEFAULT_DOCS = [
+  "Land Ownership Certificate (Lalpurja)",
+  "Property Tax Receipt (Malpot)",
+  "Blueprint / Site Plan",
+  "Tracemap",
+  "Citizenship Certificate of Owner",
+  "Field Measurement Certificate",
+  "Recent Photographs",
+  "Legal Documents",
+];
+
+function MissingDocumentPanel() {
+  const [docs, setDocs] = React.useState(() =>
+    DEFAULT_DOCS.map((label, i) => ({ id: i, label, available: false }))
+  );
+  const [collapsed, setCollapsed] = React.useState(false);
+  const [newText, setNewText] = React.useState("");
+  const nextId = React.useRef(DEFAULT_DOCS.length);
+
+  const toggle = (id) =>
+    setDocs(prev => prev.map(d => d.id === id ? { ...d, available: !d.available } : d));
+
+  const addDoc = () => {
+    const text = newText.trim();
+    if (!text) return;
+    setDocs(prev => [...prev, { id: nextId.current++, label: text, available: false }]);
+    setNewText("");
+  };
+
+  const removeDoc = (id) => setDocs(prev => prev.filter(d => d.id !== id));
+
+  const missing = docs.filter(d => !d.available);
+  const available = docs.filter(d => d.available);
+
+  return (
+    <div style={{ background: "#fff", border: "1.5px solid #dde1e7", borderRadius: 12, overflow: "hidden" }}>
+      {/* Header */}
+      <div
+        onClick={() => setCollapsed(c => !c)}
+        style={{ background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff", padding: "10px 18px", fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}
+      >
+        <span>📂 Missing Documents</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>
+            {available.length}/{docs.length} available
+            {missing.length > 0 && <span style={{ marginLeft: 8, background: "rgba(255,255,255,0.25)", borderRadius: 10, padding: "1px 8px" }}>⚠ {missing.length} missing</span>}
+          </span>
+          <span style={{ fontSize: 16, opacity: 0.8 }}>{collapsed ? "▶" : "▼"}</span>
+        </div>
+      </div>
+
+      {!collapsed && (
+        <div style={{ padding: "16px 18px" }}>
+          {/* Document list */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+            {docs.map(doc => (
+              <div key={doc.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 8, border: `1.5px solid ${doc.available ? "#27ae60" : "#f39c12"}`, background: doc.available ? "#f0fdf4" : "#fffbea" }}>
+                <input
+                  type="checkbox"
+                  checked={doc.available}
+                  onChange={() => toggle(doc.id)}
+                  style={{ width: 16, height: 16, accentColor: "#27ae60", cursor: "pointer", flexShrink: 0 }}
+                />
+                <span style={{ flex: 1, fontSize: 13, color: doc.available ? "#1a5c3a" : "#7a5c00", fontWeight: doc.available ? 500 : 400 }}>
+                  {doc.label}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: doc.available ? "#27ae60" : "#f39c12", color: "#fff", whiteSpace: "nowrap" }}>
+                  {doc.available ? "✓ Available" : "⚠ Ask Client"}
+                </span>
+                {!DEFAULT_DOCS.includes(doc.label) && (
+                  <button
+                    onClick={() => removeDoc(doc.id)}
+                    style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
+                    title="Remove"
+                  >×</button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add custom document */}
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              type="text"
+              value={newText}
+              onChange={e => setNewText(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addDoc()}
+              placeholder="Add custom document (press Enter or click +)"
+              style={{ flex: 1, padding: "9px 12px", border: "1.5px solid #dde1e7", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }}
+            />
+            <button
+              onClick={addDoc}
+              disabled={!newText.trim()}
+              style={{ padding: "9px 18px", background: newText.trim() ? "linear-gradient(135deg,#7c3aed,#a855f7)" : "#ccc", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: newText.trim() ? "pointer" : "not-allowed" }}
+            >+ Add</button>
+          </div>
+
+          {/* Summary */}
+          {missing.length > 0 && (
+            <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "#fff8e1", border: "1.5px solid #f39c12" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#7a5c00", marginBottom: 5 }}>📋 Documents to Request from Client:</div>
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {missing.map(d => (
+                  <li key={d.id} style={{ fontSize: 12, color: "#7a5c00", marginBottom: 2 }}>{d.label}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Field Charge Dialog ───────────────────────────────────────────────────────
 function FieldChargeDialog({ onConfirm, onCancel }) {
   const [received, setReceived] = React.useState(null);
@@ -358,6 +473,9 @@ export default function ReportSection({
           </div>
         ))}
       </div>
+
+      {/* ── Missing Document Checklist ── */}
+      <MissingDocumentPanel />
 
       {/* ── Bill Summary Panel ── */}
       {reportType === "preliminary" && fieldChargeReceived !== null && (
