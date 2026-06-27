@@ -2858,7 +2858,7 @@ app.post("/api/field/links", auth(["admin"]), async (req, res) => {
 app.get("/api/field/links", auth(["admin"]), async (req, res) => {
   try {
     const links = await dbAll(
-      "SELECT * FROM field_links WHERE company_code=? ORDER BY created_at DESC",
+      "SELECT * FROM field_links WHERE company_code=? AND active=1 ORDER BY created_at DESC",
       [req.user.companyCode]
     );
     res.json(links);
@@ -2869,10 +2869,10 @@ app.get("/api/field/links", auth(["admin"]), async (req, res) => {
 app.delete("/api/field/links/:id", auth(["admin"]), async (req, res) => {
   try {
     await dbRun(
-      "UPDATE field_links SET active=0 WHERE id=? AND company_code=?",
+      "DELETE FROM field_links WHERE id=? AND company_code=?",
       [req.params.id, req.user.companyCode]
     );
-    res.json({ message: "Link deactivated" });
+    res.json({ message: "Link deleted" });
   } catch (err) { handleError(res, err, "DELETE /api/field/links/:id"); }
 });
 
