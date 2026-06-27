@@ -327,7 +327,7 @@ export default function FieldSubmissions({ onUseData, user }) {
                   <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>LABEL (optional)</div>
                   <input value={newLinkLabel} onChange={e => setNewLinkLabel(e.target.value)}
                     placeholder="e.g. Pokhara team"
-                    style={{ width: "100%", padding: "8px 10px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 13, boxSizing: "border-box", outline: "none" }} />
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.2)", background: "#fff", color: "#0f1f3d", fontSize: 13, boxSizing: "border-box", outline: "none" }} />
                 </div>
                 <div>
                   <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>TYPE</div>
