@@ -39,6 +39,8 @@ const _nativeStr = (p, sqm) => {
   const x=sqmToRadp(sqm); return `${x.r}-${x.a}-${x.p}-${x.d}`;
 };
 
+const fullName = (person) => [person?.salutation, person?.name].filter(Boolean).join(" ");
+
 function calcValFee(fmv) {
   if (!fmv || fmv <= 0) return 0;
   if (fmv <= 2_500_000)     return 7_500;
@@ -66,8 +68,6 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
   // Otherwise fall through to the original (final) layout below
   const T = buildTheme(s.reportColorTheme);
   const rType = (s.reportType||"preliminary").toUpperCase();
-
-  const fullName = (person) => [person?.salutation, person?.name].filter(Boolean).join(" ");
 
   const clientLine = (s.clients||[]).map(cl=>{
     const parts=[];
