@@ -325,7 +325,7 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
   const [feeTierSaving, setFeeTierSaving] = useState(false);
   const [feeTierMsg, setFeeTierMsg]     = useState("");
   const [editingTier, setEditingTier]   = useState(null); // null | tier object with _bank, _idx
-  const [feeTierBank, setFeeTierBank]   = useState("Default"); // which bank is being viewed/edited
+  const [feeTierBank, setFeeTierBank]   = useState("Nepal Valuators Association"); // which bank is being viewed/edited
 
   const [modal, setModal] = useState(null);
   const [target, setTarget] = useState(null);
@@ -1361,7 +1361,7 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
             TAB: FEE TIERS
         ══════════════════════════════════════════ */}
         {tab === "feetiers" && (() => {
-          const allBankNames = ["Default", ...bankList];
+          const allBankNames = ["Nepal Valuators Association", ...bankList];
           const activeTiers = feeTiersMap[feeTierBank] || [];
           return (
             <div>
@@ -1386,12 +1386,12 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                 <div style={{ padding: "14px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div>
                     <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.navy }}>
-                      {feeTierBank === "Default" ? "🏦 Default Fee Schedule" : `🏦 ${feeTierBank}`}
+                      {`🏦 ${feeTierBank}`}
                     </h3>
                     <p style={{ margin: "4px 0 0", fontSize: 12, color: C.muted }}>
-                      {feeTierBank === "Default"
-                        ? "Applied to reports whose bank has no specific schedule configured."
-                        : `Applied only when this bank is selected on a report. Falls back to Default if empty.`}
+                      {feeTierBank === "Nepal Valuators Association"
+                        ? "Applied when Nepal Valuators Association billing system is selected on a report."
+                        : `Applied only when this bank is selected on a report. Falls back to Nepal Valuators Association schedule if empty.`}
                     </p>
                   </div>
                   <button
@@ -1406,7 +1406,7 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                     <div style={{ fontSize: 32, marginBottom: 10 }}>📐</div>
                     <p style={{ margin: 0, fontWeight: 600, color: C.text2 }}>No tiers for {feeTierBank}</p>
                     <p style={{ margin: "6px 0 0", fontSize: 12 }}>
-                      {feeTierBank === "Default" ? "Using built-in NRB schedule as fallback." : "Will use Default schedule (or built-in NRB if Default is also empty)."}
+                      {feeTierBank === "Nepal Valuators Association" ? "Using built-in NVA schedule as fallback." : "Will use Nepal Valuators Association schedule (or built-in NVA if that is also empty)."}
                     </p>
                   </div>
                 ) : (
@@ -1444,7 +1444,7 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                 )}
 
                 <div style={{ padding: "12px 24px", borderTop: `1px solid ${C.border}`, background: "#f9f9f9", fontSize: 12, color: C.muted }}>
-                  <strong>How it works:</strong> Tiers are matched in order by FMV. Tier 1 base fee is a flat minimum. Subsequent tiers: fee = Base + (FMV − prev upper limit) × Rate/100. Leave "Up To" blank for the last open-ended tier. Priority: bank-specific → Default → built-in NRB schedule.
+                  <strong>How it works:</strong> Tiers are matched in order by FMV. fee = Base + (FMV − prev upper limit) × Rate. Leave "Up To" blank for the last open-ended tier. Priority: bank-specific → Nepal Valuators Association → built-in NVA schedule.
                 </div>
               </div>
 

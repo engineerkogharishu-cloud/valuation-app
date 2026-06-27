@@ -1066,6 +1066,11 @@ app.get("/api/company/fee-tiers", auth(), async (req, res) => {
       const parsed = JSON.parse(company.fee_tiers || "{}");
       // Migrate old array format to empty object
       tiers = Array.isArray(parsed) ? {} : (parsed && typeof parsed === "object" ? parsed : {});
+      // Migrate old "Default" key to "Nepal Valuators Association"
+      if (tiers["Default"] !== undefined && tiers["Nepal Valuators Association"] === undefined) {
+        tiers["Nepal Valuators Association"] = tiers["Default"];
+        delete tiers["Default"];
+      }
     } catch (_) {}
     res.json({ fee_tiers: tiers });
   } catch (err) {

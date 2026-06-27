@@ -359,15 +359,18 @@ export default function ReportSection({
   // Resolve which tiers apply based on selected billing system
   const { resolvedTiers, billingSystemLabel } = React.useMemo(() => {
     const normalize = (list) => list.map(t => ({ ...t, upto: t.upto === null ? Infinity : t.upto }));
+    const NVA_KEY = "Nepal Valuators Association";
     if (billingSystem === "bank") {
       const bankKey = bank || "";
       if (feeTiersMap[bankKey] && feeTiersMap[bankKey].length > 0)
         return { resolvedTiers: normalize(feeTiersMap[bankKey]), billingSystemLabel: `${bankKey} Schedule` };
-      if (feeTiersMap["Default"] && feeTiersMap["Default"].length > 0)
-        return { resolvedTiers: normalize(feeTiersMap["Default"]), billingSystemLabel: "Default Bank Schedule" };
+      if (feeTiersMap[NVA_KEY] && feeTiersMap[NVA_KEY].length > 0)
+        return { resolvedTiers: normalize(feeTiersMap[NVA_KEY]), billingSystemLabel: `${NVA_KEY} Schedule` };
     }
-    // "nva" or fallback — always use built-in NVA schedule
-    return { resolvedTiers: DEFAULT_FEE_TIERS, billingSystemLabel: "Nepal Valuators Association Schedule" };
+    // "nva" or fallback — use NVA custom tiers if configured, else built-in
+    if (feeTiersMap[NVA_KEY] && feeTiersMap[NVA_KEY].length > 0)
+      return { resolvedTiers: normalize(feeTiersMap[NVA_KEY]), billingSystemLabel: `${NVA_KEY} Schedule` };
+    return { resolvedTiers: DEFAULT_FEE_TIERS, billingSystemLabel: `${NVA_KEY} Schedule` };
   }, [feeTiersMap, bank, billingSystem]);
 
   const valuationFee = calcValuationFeeWithTiers(finalFMV || 0, resolvedTiers);
