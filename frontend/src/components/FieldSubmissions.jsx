@@ -6,35 +6,49 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleString("en-NP") : "—");
 
 // Map field submission data into ValuationForm initialState
 function toFormState(data, photos) {
-  const makePersonEntry = (name) => name ? [{
+  const makePersonEntry = (name, citizenshipNo, issuedDate, issuedBy) => name ? [{
     id: uid(), showPerson: true, showCompany: false,
     person: {
-      name, citizenshipNo: "", issuedDate: "", issuedBy: "",
+      name,
+      citizenshipNo: citizenshipNo || "",
+      issuedDate:    issuedDate    || "",
+      issuedBy:      issuedBy      || "",
       address: data.location || "", contact: "", fatherName: "", husbandName: "", grandfatherName: "",
     },
     company: { name: "", panVat: "", regNo: "", regDate: "", regOn: "", address: "", contact: "", directors: [] },
   }] : undefined;
 
-  const client = makePersonEntry(data.clientName);
-  // Owner: use ownerName if provided, otherwise fall back to clientName
-  const ownerEntry = makePersonEntry(data.ownerName || data.clientName);
+  const client     = makePersonEntry(data.clientName, data.clientCitizenshipNo, data.clientIssuedDate, data.clientIssuedBy);
+  const ownerEntry = makePersonEntry(data.ownerName || data.clientName, data.ownerCitizenshipNo, data.ownerIssuedDate, data.ownerIssuedBy);
 
   // Build one property per plot number (or a single property if none specified)
   const plotNos = Array.isArray(data.plotNos) && data.plotNos.length > 0
     ? data.plotNos
     : [data.plotNo || ""];
+  const traceSheets = data.traceSheets || {};
+  const ar = data.area || {};
 
   const properties = plotNos.map((plotNo, i) => ({
-    id: uid(), plotNo: plotNo || "", traceSheetNo: "", landType: "",
-    addressLalpurja: "", presentAddress: data.location || "",
-    category: "", areaUnit: "radp", areaSqm: "",
-    areaRadp: { r: "", a: "", p: "", d: "" }, areaBkd: { b: "", k: "", d: "" },
-    ownershipType: "", ownerName: data.ownerName || data.clientName || "", tenantInfo: "",
-    location: data.location || "",
-    lat: i === 0 ? (data.lat || "") : "",
-    lng: i === 0 ? (data.lng || "") : "",
-    googlePlusCode: i === 0 ? (data.googlePlusCode || "") : "",
-    _mapEnabled: i === 0 && !!(data.lat && data.lng),
+    id: uid(),
+    plotNo:          plotNo || "",
+    traceSheetNo:    traceSheets[plotNo] || "",
+    landType:        data.landType        || "",
+    addressLalpurja: data.addressLalpurja || "",
+    presentAddress:  data.location        || "",
+    category:        data.landCategory    || "",
+    areaUnit:        "radp",
+    areaSqm:         "",
+    areaRadp: { r: ar.r || "", a: ar.a || "", p: ar.p || "", d: ar.d || "" },
+    areaBkd:  { b: "", k: "", d: "" },
+    ownershipType:   data.ownershipType   || "",
+    faceDirection:   data.faceDirection   || "",
+    ownerName:       data.ownerName || data.clientName || "",
+    tenantInfo:      "",
+    location:        data.location        || "",
+    lat:             i === 0 ? (data.lat || "") : "",
+    lng:             i === 0 ? (data.lng || "") : "",
+    googlePlusCode:  i === 0 ? (data.googlePlusCode || "") : "",
+    _mapEnabled:     i === 0 && !!(data.lat && data.lng),
   }));
 
   // Build propDescriptions: hazards → dedicated fields per property
@@ -67,20 +81,39 @@ function toFormState(data, photos) {
     });
   }
 
-  // Pre-create a building with building rate pre-filled for all floor area rows
+  // Building — map from new mobile fields or fall back to rate-only
   let buildings    = undefined;
   let buildingVals = undefined;
   let hasBuilding  = undefined;
-  if (data.buildingRate) {
+  const bldData = data.building; // new format: { present, numFloors, structureType, ... }
+  const hasBldgInfo = bldData?.present === true;
+  const hasBldgRate = !!data.buildingRate;
+
+  if (hasBldgInfo || hasBldgRate) {
     const bldg = emptyBuilding();
-    bldg.ownerSource = properties[0].id;
-    bldg.ownerName   = data.clientName || "";
-    bldg.plotNo      = plotNos[0] || "";
+    bldg.ownerSource        = properties[0].id;
+    bldg.ownerName          = data.ownerName || data.clientName || "";
+    bldg.plotNo             = plotNos[0] || "";
+    if (hasBldgInfo) {
+      bldg.numFloors          = bldData.numFloors          || "";
+      bldg.yearOfConstruction = bldData.yearOfConstruction || "";
+      bldg.expectedLife       = bldData.expectedLife       || "60";
+      bldg.structureType      = bldData.structureType      || "";
+      bldg.foundationType     = bldData.foundationType     || "";
+      bldg.faceDirection      = bldData.faceDirection      || "";
+    }
     buildingVals = {
       [bldg.id]: {
-        floorRates: Object.fromEntries(
-          bldg.areaTable.map((row) => [row.id, String(data.buildingRate)])
-        ),
+        ...(hasBldgRate ? {
+          floorRates: Object.fromEntries(
+            bldg.areaTable.map((row) => [row.id, String(data.buildingRate)])
+          ),
+        } : {}),
+        ...(hasBldgInfo && bldData.totalAreaSqft ? {
+          totalAreaSqft: String(bldData.totalAreaSqft),
+        } : {}),
+        buildingPermit: hasBldgInfo ? (bldData.buildingPermit || "") : "",
+        remarks:        hasBldgInfo ? (bldData.remarks || "")        : "",
       },
     };
     buildings   = [bldg];
@@ -88,10 +121,11 @@ function toFormState(data, photos) {
   }
 
   return {
-    bank:        data.bank      || "",
-    branch:      data.branch    || "",
-    visitDate:   data.visitDate || "",
-    remarks:     data.notes     || "",
+    bank:        data.bank        || "",
+    branch:      data.branch      || "",
+    visitDate:   data.visitDate   || "",
+    reportDate:  data.reportDate  || "",
+    remarks:     data.notes       || "",
     clients:     client,
     owners:      ownerEntry,
     properties,
