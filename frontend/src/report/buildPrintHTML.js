@@ -1955,17 +1955,22 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
 
   const npr = (n) => `NPR ${Math.round(n).toLocaleString("en-NP")}`;
 
-  const feeScheduleRows = [
-    ["a","Up to 25,00,000",       "Rs. 7,500.00",                         "7,500.00"],
-    ["b","Up to 50,00,000",       "Rs. 7,500.00 + (Diff b-a)×0.20%",     "12,500.00"],
-    ["c","Up to 1,00,00,000",     "Rs. 12,500.00 + (Diff c-b)×0.15%",    "20,000.00"],
-    ["d","Up to 5,00,00,000",     "Rs. 20,000.00 + (Diff d-c)×0.10%",    "60,000.00"],
-    ["e","Up to 10,00,00,000",    "Rs. 60,000.00 + (Diff e-d)×0.08%",   "1,00,000.00"],
-    ["f","Up to 20,00,00,000",    "Rs. 1,00,000.00 + (Diff f-e)×0.05%", "1,50,000.00"],
-    ["g","Up to 50,00,00,000",    "Rs. 1,50,000.00 + (Diff g-f)×0.03%", "2,40,000.00"],
-    ["h","Up to 1,00,00,00,000",  "Rs. 2,40,000.00 + (Diff h-g)×0.02%", "3,40,000.00"],
-    ["i","100 Cr above",          "Rs. 3,40,000.00 + (Diff i-h)×0.01%", "3,40,000.00+"],
-  ];
+  // Build reference schedule rows from admin-configured tiers
+  const adminTiers = (s.feeTiers && Array.isArray(s.feeTiers) && s.feeTiers.length > 0) ? s.feeTiers : null;
+  const feeScheduleRows = adminTiers
+    ? adminTiers.map((t, i) => {
+        const alpha = String.fromCharCode(97 + i);
+        const uptoAmt = t.upto == null || t.upto === Infinity ? null : Number(t.upto);
+        const uptoStr = uptoAmt == null ? "Above last slab" : `Up to ${Math.round(uptoAmt).toLocaleString("en-NP")}`;
+        const floor   = i === 0 ? 0 : (adminTiers[i-1].upto == null ? 0 : Number(adminTiers[i-1].upto));
+        const feeStr  = i === 0
+          ? `Base: NPR ${Math.round(Number(t.base)||0).toLocaleString("en-NP")} + FMV × ${Number(t.rate||0).toFixed(4)}`
+          : `NPR ${Math.round(Number(t.base)||0).toLocaleString("en-NP")} + (FMV − ${Math.round(floor).toLocaleString("en-NP")}) × ${Number(t.rate||0).toFixed(4)}`;
+        const sampleFMV = uptoAmt != null ? uptoAmt : floor + 10000000;
+        const sampleFee = Math.round(Number(t.base||0) + (sampleFMV - floor) * Number(t.rate||0));
+        return [alpha, uptoStr, feeStr, Math.round(sampleFee).toLocaleString("en-NP"), floor, uptoAmt];
+      })
+    : null;
 
   // ── Letterhead + text-box layout (same approach as letter page) ──
   const lhSrc = s.letterheadPng || "";
@@ -2167,39 +2172,40 @@ function buildBillOnlyHTML(s, suggestedFilename, autoPrint) {
         </table>
       </div>
 
-      <!-- Fee Schedule Reference -->
-      <div style="margin-bottom:5pt">
+      <!-- Fee Schedule Reference (admin-configured tiers) -->
+      ${feeScheduleRows ? `<div style="margin-bottom:5pt">
         <div style="font-size:7pt;font-weight:bold;color:${T.primary};text-transform:uppercase;letter-spacing:0.4px;border-bottom:0.5pt solid #ccc;padding-bottom:1.5pt;margin-bottom:3pt">
           Reference: ${esc(billingSystemLabel)}
         </div>
-        <table style="font-size:7pt">
+        <table style="font-size:7pt;width:100%;border-collapse:collapse">
           <thead>
             <tr style="background:${T.lighter};-webkit-print-color-adjust:exact;print-color-adjust:exact">
               <th style="padding:2pt 3pt;border:0.5pt solid #ccc;width:5%;text-align:center;color:${T.primary}">S.No.</th>
-              <th style="padding:2pt 3pt;border:0.5pt solid #ccc;text-align:left;color:${T.primary}">Upto</th>
-              <th style="padding:2pt 3pt;border:0.5pt solid #ccc;text-align:left;color:${T.primary}">Fee Payable</th>
-              <th style="padding:2pt 3pt;border:0.5pt solid #ccc;text-align:right;color:${T.primary}">Amount (NPR)</th>
+              <th style="padding:2pt 3pt;border:0.5pt solid #ccc;text-align:left;color:${T.primary}">Label</th>
+              <th style="padding:2pt 3pt;border:0.5pt solid #ccc;text-align:left;color:${T.primary}">Upto FMV</th>
+              <th style="padding:2pt 3pt;border:0.5pt solid #ccc;text-align:left;color:${T.primary}">Fee Formula</th>
+              <th style="padding:2pt 3pt;border:0.5pt solid #ccc;text-align:right;color:${T.primary}">Fee at Upto (NPR)</th>
             </tr>
           </thead>
           <tbody>
-            ${feeScheduleRows.map(([sno,u,f,a],i) => {
-              const active = finalFMV>0&&(
-                (i===0&&finalFMV<=2500000)||(i===1&&finalFMV>2500000&&finalFMV<=5000000)||
-                (i===2&&finalFMV>5000000&&finalFMV<=10000000)||(i===3&&finalFMV>10000000&&finalFMV<=50000000)||
-                (i===4&&finalFMV>50000000&&finalFMV<=100000000)||(i===5&&finalFMV>100000000&&finalFMV<=200000000)||
-                (i===6&&finalFMV>200000000&&finalFMV<=500000000)||(i===7&&finalFMV>500000000&&finalFMV<=1000000000)||
-                (i===8&&finalFMV>1000000000));
+            ${feeScheduleRows.map(([sno,uptoStr,feeStr,sampleFee,floor,uptoAmt], i) => {
+              const active = finalFMV > 0 && (
+                (uptoAmt == null && finalFMV > floor) ||
+                (uptoAmt != null && finalFMV > floor && finalFMV <= uptoAmt)
+              );
               const bg = active ? T.lighter : i%2===0 ? "#fff" : T.info;
+              const label = esc(adminTiers[i].label || "");
               return `<tr style="background:${bg};${active?"font-weight:bold;":""}-webkit-print-color-adjust:exact;print-color-adjust:exact">
                 <td style="padding:1.5pt 3pt;border:0.5pt solid #ccc;text-align:center">${sno}.</td>
-                <td style="padding:1.5pt 3pt;border:0.5pt solid #ccc">${u}</td>
-                <td style="padding:1.5pt 3pt;border:0.5pt solid #ccc">${f}</td>
-                <td style="padding:1.5pt 3pt;border:0.5pt solid #ccc;text-align:right">${a}</td>
+                <td style="padding:1.5pt 3pt;border:0.5pt solid #ccc">${label}</td>
+                <td style="padding:1.5pt 3pt;border:0.5pt solid #ccc">${uptoStr}</td>
+                <td style="padding:1.5pt 3pt;border:0.5pt solid #ccc">${feeStr}</td>
+                <td style="padding:1.5pt 3pt;border:0.5pt solid #ccc;text-align:right">${uptoAmt == null ? "—" : sampleFee}</td>
               </tr>`;
             }).join("")}
           </tbody>
         </table>
-      </div>
+      </div>` : ""}
 
       <!-- Signature -->
       <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:6pt">
