@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "") + "/api";
 
@@ -23,6 +23,7 @@ function encodePlusCode(lat, lng) {
   return chars.join("");
 }
 
+// ── Photo compression — iterative, targets < 200 KB ──────────
 async function compressPhoto(file) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -40,12 +41,70 @@ async function compressPhoto(file) {
         canvas.width  = width;
         canvas.height = height;
         canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", 0.78));
+
+        // Iteratively reduce quality until < 200 KB
+        const TARGET_BYTES = 200 * 1024;
+        let quality = 0.85;
+        let dataUrl;
+        do {
+          dataUrl = canvas.toDataURL("image/jpeg", quality);
+          // base64: approx 0.75 bytes per char minus header
+          const approxBytes = Math.round((dataUrl.length - 22) * 0.75);
+          if (approxBytes <= TARGET_BYTES || quality <= 0.40) break;
+          quality = Math.max(0.40, quality - 0.05);
+        } while (true); // eslint-disable-line no-constant-condition
+
+        resolve(dataUrl);
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
   });
+}
+
+// ── Offline queue helpers (localStorage) ─────────────────────
+const QUEUE_PREFIX = "field_queue_";
+
+function readQueue() {
+  const items = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(QUEUE_PREFIX)) {
+      try { items.push({ key: k, ...JSON.parse(localStorage.getItem(k)) }); }
+      catch (_) {}
+    }
+  }
+  return items;
+}
+
+function queueCount() {
+  let n = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    if ((localStorage.key(i) || "").startsWith(QUEUE_PREFIX)) n++;
+  }
+  return n;
+}
+
+function saveToQueue(token, payload) {
+  const key = QUEUE_PREFIX + token + "_" + Date.now();
+  localStorage.setItem(key, JSON.stringify({ token, payload, savedAt: new Date().toISOString() }));
+  return key;
+}
+
+async function flushQueue() {
+  const items = readQueue();
+  let sent = 0;
+  for (const item of items) {
+    try {
+      const res = await fetch(`${API_BASE}/field/submit`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(item.payload),
+      });
+      if (res.ok) { localStorage.removeItem(item.key); sent++; }
+    } catch (_) { /* keep for next attempt */ }
+  }
+  return sent;
 }
 
 export default function MobileCollectPage({ token }) {
@@ -54,18 +113,46 @@ export default function MobileCollectPage({ token }) {
   const [tokenError,  setTokenError]  = useState("");
   const [shareCopied, setShareCopied] = useState(false);
 
+  // ── Offline state ─────────────────────────────────────────
+  const [isOnline,     setIsOnline]     = useState(navigator.onLine);
+  const [pendingCount, setPendingCount] = useState(queueCount);
+  const [syncToast,    setSyncToast]    = useState("");
+
+  const updatePending = () => setPendingCount(queueCount());
+
+  const attemptFlush = useCallback(async () => {
+    const sent = await flushQueue();
+    if (sent > 0) {
+      setSyncToast(`✅ ${sent} queued submission${sent > 1 ? "s" : ""} sent successfully`);
+      setTimeout(() => setSyncToast(""), 4000);
+      updatePending();
+    }
+  }, []);
+
+  useEffect(() => {
+    const goOnline  = () => { setIsOnline(true);  attemptFlush(); };
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online",  goOnline);
+    window.addEventListener("offline", goOffline);
+    if (navigator.onLine) attemptFlush();
+    return () => {
+      window.removeEventListener("online",  goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, [attemptFlush]);
+
   const handleShare = async () => {
     const url = window.location.href;
     if (navigator.share) {
-      try {
-        await navigator.share({ title: "Field Data Collection", text: `Fill in field data for ${companyName}`, url });
-      } catch (_) {}
+      try { await navigator.share({ title: "Field Data Collection", text: `Fill in field data for ${companyName}`, url }); }
+      catch (_) {}
     } else {
       await navigator.clipboard.writeText(url);
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
     }
   };
+
   const todayISO = () => new Date().toISOString().slice(0, 10);
 
   const [form, setForm] = useState({
@@ -73,6 +160,7 @@ export default function MobileCollectPage({ token }) {
     bank: "", branch: "", visitDate: todayISO(), notes: "", lat: "", lng: "", googlePlusCode: "",
     landMarketRate: "", buildingRate: "",
   });
+
   const EMPTY_HAZARDS = {
     highTensionLine: false, highTensionLineComment: "", highTensionLineDistance: "", highTensionLineSide: "",
     river:           false, riverComment:           "", riverDistance:           "", riverSide:           "",
@@ -86,18 +174,18 @@ export default function MobileCollectPage({ token }) {
   const toggleHazard  = (k)    => setHazards((h) => ({ ...h, [k]: !h[k] }));
   const setHazardNote = (k, v) => setHazards((h) => ({ ...h, [k]: v }));
 
-  // Multiple plot numbers
   const [plotNos, setPlotNos] = useState([""]);
 
-  // Multiple roads
   const EMPTY_ROAD = { type: "", width: "", side: "", surface: "", remarks: "" };
   const [roads, setRoads] = useState([{ ...EMPTY_ROAD }]);
-  const addRoad    = () => setRoads((r) => [...r, { ...EMPTY_ROAD }]);
-  const removeRoad = (i) => setRoads((r) => r.filter((_, idx) => idx !== i));
+  const addRoad      = () => setRoads((r) => [...r, { ...EMPTY_ROAD }]);
+  const removeRoad   = (i) => setRoads((r) => r.filter((_, idx) => idx !== i));
   const setRoadField = (i, k, v) => setRoads((r) => r.map((row, idx) => idx === i ? { ...row, [k]: v } : row));
-  const [photos,     setPhotos]     = useState([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted,  setSubmitted]  = useState(false);
+
+  const [photos,      setPhotos]      = useState([]);
+  const [compressing, setCompressing] = useState(false);
+  const [submitting,  setSubmitting]  = useState(false);
+  const [submitted,   setSubmitted]   = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [gpsLoading,  setGpsLoading]  = useState(false);
   const fileRef = useRef();
@@ -112,22 +200,26 @@ export default function MobileCollectPage({ token }) {
           setBanks(Array.isArray(d.banks) ? d.banks : []);
         }
       })
-      .catch(() => setTokenError("Could not verify link. Check your internet connection."));
+      .catch(() => {
+        if (!navigator.onLine) setCompanyName("");
+        else setTokenError("Could not verify link. Check your internet connection.");
+      });
   }, [token]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  // Plot number helpers
-  const setPlotNo = (i, val) => setPlotNos((p) => p.map((v, idx) => idx === i ? val : v));
+  const setPlotNo    = (i, val) => setPlotNos((p) => p.map((v, idx) => idx === i ? val : v));
   const addPlotNo    = () => setPlotNos((p) => [...p, ""]);
   const removePlotNo = (i) => setPlotNos((p) => p.filter((_, idx) => idx !== i));
 
   const handlePhotos = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+    setCompressing(true);
     const compressed = await Promise.all(files.map(compressPhoto));
     setPhotos((prev) => [...prev, ...compressed].slice(0, 20));
     e.target.value = "";
+    setCompressing(false);
   };
 
   const removePhoto = (i) => setPhotos((p) => p.filter((_, idx) => idx !== i));
@@ -139,12 +231,7 @@ export default function MobileCollectPage({ token }) {
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
-        setForm((f) => ({
-          ...f,
-          lat: lat.toFixed(6),
-          lng: lng.toFixed(6),
-          googlePlusCode: encodePlusCode(lat, lng),
-        }));
+        setForm((f) => ({ ...f, lat: lat.toFixed(6), lng: lng.toFixed(6), googlePlusCode: encodePlusCode(lat, lng) }));
         setGpsLoading(false);
       },
       () => setGpsLoading(false),
@@ -153,10 +240,11 @@ export default function MobileCollectPage({ token }) {
   };
 
   const buildPayload = () => ({
+    token,
     data: {
       ...form,
       plotNos: plotNos.map((p) => p.trim()).filter(Boolean),
-      roads: roads.filter((r) => r.type || r.width || r.side || r.surface || r.remarks),
+      roads:   roads.filter((r) => r.type || r.width || r.side || r.surface || r.remarks),
       hazards,
     },
     photos,
@@ -168,25 +256,13 @@ export default function MobileCollectPage({ token }) {
     const json     = JSON.stringify(payload, null, 2);
     const blob     = new Blob([json], { type: "application/json" });
     const file     = new File([blob], filename, { type: "application/json" });
-
-    // Try native file share (works on Android/iOS)
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({
-          title:  "Field Data — " + (form.clientName || form.location || "Entry"),
-          text:   `Field data collected for ${companyName}`,
-          files:  [file],
-        });
-        return;
-      } catch (_) { /* user cancelled or not supported — fall through to download */ }
+      try { await navigator.share({ title: "Field Data — " + (form.clientName || form.location || "Entry"), text: `Field data collected for ${companyName}`, files: [file] }); return; }
+      catch (_) {}
     }
-
-    // Fallback: trigger file download
     const url  = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href     = url;
-    link.download = filename;
-    link.click();
+    link.href = url; link.download = filename; link.click();
     URL.revokeObjectURL(url);
   };
 
@@ -196,18 +272,35 @@ export default function MobileCollectPage({ token }) {
       return setSubmitError("Please enter at least a client name or location.");
     setSubmitting(true);
     setSubmitError("");
-    const { data, photos: pics } = buildPayload();
+    const payload = buildPayload();
+
+    // ── Offline: queue it ─────────────────────────────────
+    if (!navigator.onLine) {
+      saveToQueue(token, payload);
+      updatePending();
+      setSubmitting(false);
+      setSubmitted(true);
+      return;
+    }
+
+    // ── Online: submit directly ───────────────────────────
     try {
-      const res = await fetch(`${API_BASE}/field/submit`, {
+      const res  = await fetch(`${API_BASE}/field/submit`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ token, data, photos: pics }),
+        body:    JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Submission failed");
       setSubmitted(true);
     } catch (err) {
-      setSubmitError(err.message);
+      if (!navigator.onLine || err.message === "Failed to fetch") {
+        saveToQueue(token, payload);
+        updatePending();
+        setSubmitted(true);
+      } else {
+        setSubmitError(err.message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -220,11 +313,12 @@ export default function MobileCollectPage({ token }) {
     setRoads([{ ...EMPTY_ROAD }]);
     setPhotos([]);
     setSubmitted(false);
+    setSubmitError("");
   };
 
   // ── Render ────────────────────────────────────────────────
 
-  if (tokenError) return (
+  if (tokenError && isOnline) return (
     <div style={S.page}>
       <div style={S.card}>
         <div style={S.errorBox}>{tokenError}</div>
@@ -235,14 +329,26 @@ export default function MobileCollectPage({ token }) {
     </div>
   );
 
+  const savedOffline = submitted && !isOnline;
+
   if (submitted) return (
     <div style={S.page}>
+      {!isOnline && <OfflineBanner pendingCount={pendingCount} />}
       <div style={{ ...S.card, textAlign: "center" }}>
-        <div style={{ fontSize: 56, marginBottom: 12 }}>✅</div>
-        <h2 style={{ color: "#1a7a3f", margin: "0 0 8px" }}>Submitted!</h2>
+        <div style={{ fontSize: 56, marginBottom: 12 }}>{savedOffline ? "💾" : "✅"}</div>
+        <h2 style={{ color: savedOffline ? "#0f1f3d" : "#1a7a3f", margin: "0 0 8px" }}>
+          {savedOffline ? "Saved Offline" : "Submitted!"}
+        </h2>
         <p style={{ color: "#555", fontSize: 15 }}>
-          Your field data has been sent to {companyName}.
+          {savedOffline
+            ? "Your data is saved on this device. It will be sent automatically when you reconnect."
+            : `Your field data has been sent to ${companyName}.`}
         </p>
+        {pendingCount > 0 && (
+          <div style={S.pendingBadge}>
+            💾 {pendingCount} submission{pendingCount > 1 ? "s" : ""} queued — will send when online
+          </div>
+        )}
         <button style={S.btnSecondary} onClick={resetForm}>Submit Another</button>
       </div>
     </div>
@@ -250,6 +356,9 @@ export default function MobileCollectPage({ token }) {
 
   return (
     <div style={S.page}>
+      {!isOnline && <OfflineBanner pendingCount={pendingCount} />}
+      {syncToast && <div style={S.syncToast}>{syncToast}</div>}
+
       <div style={S.header}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: "#fff" }}>📋 Field Data Collection</div>
@@ -259,6 +368,12 @@ export default function MobileCollectPage({ token }) {
           {shareCopied ? "✓ Copied!" : "🔗 Share"}
         </button>
       </div>
+
+      {pendingCount > 0 && isOnline && (
+        <div style={{ background: "#fff3cd", borderBottom: "1px solid #ffc107", padding: "10px 20px", fontSize: 13, color: "#7a5000" }}>
+          ⏳ Sending {pendingCount} queued submission{pendingCount > 1 ? "s" : ""}…
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} style={S.card}>
 
@@ -277,14 +392,11 @@ export default function MobileCollectPage({ token }) {
             placeholder="Property owner name (if different from client)" autoComplete="off" />
         </Field>
 
-        {/* Bank — dropdown from admin setup */}
         <Field label="Bank">
           {banks.length > 0 ? (
             <select style={S.select} value={form.bank} onChange={set("bank")}>
               <option value="">— Select bank —</option>
-              {banks.map((b) => (
-                <option key={b} value={b}>{b}</option>
-              ))}
+              {banks.map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
           ) : (
             <input style={S.input} value={form.bank} onChange={set("bank")}
@@ -306,7 +418,6 @@ export default function MobileCollectPage({ token }) {
             placeholder="Ward, VDC/Municipality, District" autoComplete="off" />
         </Field>
 
-        {/* Multiple plot numbers */}
         <div style={{ marginBottom: 18 }}>
           <label style={S.label}>Plot Number(s)</label>
           {plotNos.map((val, i) => (
@@ -323,25 +434,20 @@ export default function MobileCollectPage({ token }) {
               )}
             </div>
           ))}
-          <button type="button" onClick={addPlotNo} style={S.btnAddPlot}>
-            ＋ Add Plot Number
-          </button>
+          <button type="button" onClick={addPlotNo} style={S.btnAddPlot}>＋ Add Plot Number</button>
         </div>
 
-        {/* Road Details */}
         <div style={S.roadBox}>
           <div style={S.rateTitle}>🛣️ Road Details</div>
           {roads.map((road, i) => {
-            const ROAD_TYPES   = ["Pitched / Black Topped", "Graveled", "Earthen / Kachchi", "Goreto / Footpath", "Under Construction"];
+            const ROAD_TYPES    = ["Pitched / Black Topped", "Graveled", "Earthen / Kachchi", "Goreto / Footpath", "Under Construction"];
             const ROAD_SURFACES = ["Good", "Fair", "Poor"];
-            const ROAD_SIDES   = ["North","South","East","West","North-East","North-West","South-East","South-West"];
+            const ROAD_SIDES    = ["North","South","East","West","North-East","North-West","South-East","South-West"];
             return (
               <div key={i} style={{ border: "1.5px solid #c8dff0", borderRadius: 8, padding: "12px 12px 10px", marginBottom: 10, background: "#f4f9ff", position: "relative" }}>
                 {roads.length > 1 && (
                   <button type="button" onClick={() => removeRoad(i)}
-                    style={{ position: "absolute", top: 8, right: 8, padding: "4px 9px", background: "#fff0f0", color: "#c0392b", border: "1px solid #f5c6c6", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
-                    ✕
-                  </button>
+                    style={{ position: "absolute", top: 8, right: 8, padding: "4px 9px", background: "#fff0f0", color: "#c0392b", border: "1px solid #f5c6c6", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✕</button>
                 )}
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#0f1f3d", marginBottom: 10 }}>Road {roads.length > 1 ? i + 1 : ""}</div>
                 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
@@ -383,12 +489,9 @@ export default function MobileCollectPage({ token }) {
               </div>
             );
           })}
-          <button type="button" onClick={addRoad} style={S.btnAddPlot}>
-            ＋ Add Another Road
-          </button>
+          <button type="button" onClick={addRoad} style={S.btnAddPlot}>＋ Add Another Road</button>
         </div>
 
-        {/* Rates */}
         <div style={S.rateBox}>
           <div style={S.rateTitle}>📊 Market Rates</div>
           <div style={S.rateRow}>
@@ -405,7 +508,6 @@ export default function MobileCollectPage({ token }) {
           </div>
         </div>
 
-        {/* GPS + Plus Code */}
         <Field label="GPS Coordinates">
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input style={{ ...S.input, flex: 1 }} value={form.lat ? `${form.lat}, ${form.lng}` : ""}
@@ -423,10 +525,7 @@ export default function MobileCollectPage({ token }) {
               value={form.googlePlusCode}
               onChange={set("googlePlusCode")}
               placeholder="e.g. P977+95 Kathmandu (auto-filled by GPS)"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="characters"
-              spellCheck={false}
+              autoComplete="off" autoCorrect="off" autoCapitalize="characters" spellCheck={false}
             />
             {form.lat && !form.googlePlusCode && (
               <button type="button" style={S.btnGps}
@@ -446,7 +545,6 @@ export default function MobileCollectPage({ token }) {
             placeholder="Any relevant observations, remarks, or instructions…" />
         </Field>
 
-        {/* Hazards / Encumbrances */}
         <div style={S.hazardBox}>
           <div style={S.rateTitle}>⚠️ Hazards / Encumbrances</div>
           {(() => {
@@ -506,12 +604,14 @@ export default function MobileCollectPage({ token }) {
           })()}
         </div>
 
-        {/* Photos */}
         <div style={{ marginBottom: 20 }}>
           <label style={S.label}>Photos ({photos.length}/20)</label>
-          <button type="button" style={S.btnPhoto} onClick={() => fileRef.current?.click()}>
-            📷 Add Photos
+          <button type="button" style={S.btnPhoto} onClick={() => fileRef.current?.click()} disabled={compressing}>
+            {compressing ? "⏳ Compressing photos…" : "📷 Add Photos"}
           </button>
+          <div style={{ fontSize: 11, color: "#888", marginTop: 2, marginBottom: 8 }}>
+            Photos are automatically compressed to save mobile data.
+          </div>
           <input ref={fileRef} type="file" accept="image/*" multiple capture="environment"
             style={{ display: "none" }} onChange={handlePhotos} />
           {photos.length > 0 && (
@@ -528,9 +628,17 @@ export default function MobileCollectPage({ token }) {
 
         {submitError && <div style={S.errorBox}>{submitError}</div>}
 
-        <button type="submit" style={S.btnSubmit} disabled={submitting}>
-          {submitting ? "Submitting…" : "Submit Field Data"}
+        <button type="submit"
+          style={{ ...S.btnSubmit, background: isOnline ? "#c9922a" : "#0f1f3d" }}
+          disabled={submitting || compressing}>
+          {submitting ? "Submitting…" : isOnline ? "Submit Field Data" : "💾 Save Offline"}
         </button>
+
+        {!isOnline && (
+          <p style={{ textAlign: "center", fontSize: 12, color: "#666", margin: "8px 0 0" }}>
+            You are offline — data will be saved on this device and sent automatically when you reconnect.
+          </p>
+        )}
 
         <div style={S.divider}>
           <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
@@ -549,6 +657,18 @@ export default function MobileCollectPage({ token }) {
   );
 }
 
+function OfflineBanner({ pendingCount }) {
+  return (
+    <div style={{ background: "#1a1a2e", color: "#fff", padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+      <span style={{ fontSize: 18 }}>📴</span>
+      <span style={{ flex: 1 }}>
+        You are offline — data will be saved locally and sent when you reconnect.
+        {pendingCount > 0 && <strong> ({pendingCount} queued)</strong>}
+      </span>
+    </div>
+  );
+}
+
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 18 }}>
@@ -559,21 +679,21 @@ function Field({ label, children }) {
 }
 
 const S = {
-  page:   { minHeight: "100vh", background: "#f0f2f5", fontFamily: "'Segoe UI', sans-serif" },
-  header: { background: "#0f1f3d", padding: "18px 20px 16px", marginBottom: 0, display: "flex", alignItems: "center", gap: 12 },
-  btnShare: { padding: "9px 16px", background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 },
-  card:   { background: "#fff", margin: "0 auto", maxWidth: 520, padding: "24px 20px 32px", boxShadow: "0 2px 12px rgba(0,0,0,0.08)" },
-  label:  { display: "block", fontSize: 13, fontWeight: 600, color: "#444", marginBottom: 6 },
-  input:  { width: "100%", padding: "12px 14px", border: "1.5px solid #ddd", borderRadius: 8, fontSize: 15, boxSizing: "border-box", outline: "none" },
-  select: { width: "100%", padding: "12px 14px", border: "1.5px solid #ddd", borderRadius: 8, fontSize: 15, boxSizing: "border-box", background: "#fff", appearance: "auto" },
-  btnGps: { padding: "12px 14px", background: "#0f1f3d", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", fontSize: 14 },
-  btnPhoto: { width: "100%", padding: "13px", background: "#f5f5f5", border: "1.5px dashed #bbb", borderRadius: 8, cursor: "pointer", fontSize: 15, color: "#555", marginBottom: 12 },
-  btnSubmit: { width: "100%", padding: "15px", background: "#c9922a", color: "#fff", border: "none", borderRadius: 10, fontSize: 17, fontWeight: 700, cursor: "pointer", marginTop: 8 },
-  btnSecondary:  { marginTop: 16, padding: "12px 28px", background: "#0f1f3d", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, cursor: "pointer", fontWeight: 600 },
-  btnShareData:  { width: "100%", padding: "13px", background: "#fff", color: "#0f1f3d", border: "2px solid #0f1f3d", borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: "pointer" },
-  divider:       { display: "flex", alignItems: "center", gap: 10, margin: "14px 0 12px", color: "#aaa", fontSize: 13 },
-  shareHint:     { textAlign: "center", fontSize: 12, color: "#888", margin: "8px 0 0", lineHeight: 1.5 },
-  btnAddPlot: { padding: "8px 14px", background: "#f0f4ff", color: "#0f1f3d", border: "1px solid #c0cfe8", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 },
+  page:         { minHeight: "100vh", background: "#f0f2f5", fontFamily: "'Segoe UI', sans-serif" },
+  header:       { background: "#0f1f3d", padding: "18px 20px 16px", marginBottom: 0, display: "flex", alignItems: "center", gap: 12 },
+  btnShare:     { padding: "9px 16px", background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 },
+  card:         { background: "#fff", margin: "0 auto", maxWidth: 520, padding: "24px 20px 32px", boxShadow: "0 2px 12px rgba(0,0,0,0.08)" },
+  label:        { display: "block", fontSize: 13, fontWeight: 600, color: "#444", marginBottom: 6 },
+  input:        { width: "100%", padding: "12px 14px", border: "1.5px solid #ddd", borderRadius: 8, fontSize: 15, boxSizing: "border-box", outline: "none" },
+  select:       { width: "100%", padding: "12px 14px", border: "1.5px solid #ddd", borderRadius: 8, fontSize: 15, boxSizing: "border-box", background: "#fff", appearance: "auto" },
+  btnGps:       { padding: "12px 14px", background: "#0f1f3d", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", fontSize: 14 },
+  btnPhoto:     { width: "100%", padding: "13px", background: "#f5f5f5", border: "1.5px dashed #bbb", borderRadius: 8, cursor: "pointer", fontSize: 15, color: "#555", marginBottom: 4 },
+  btnSubmit:    { width: "100%", padding: "15px", color: "#fff", border: "none", borderRadius: 10, fontSize: 17, fontWeight: 700, cursor: "pointer", marginTop: 8 },
+  btnSecondary: { marginTop: 16, padding: "12px 28px", background: "#0f1f3d", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, cursor: "pointer", fontWeight: 600 },
+  btnShareData: { width: "100%", padding: "13px", background: "#fff", color: "#0f1f3d", border: "2px solid #0f1f3d", borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: "pointer" },
+  divider:      { display: "flex", alignItems: "center", gap: 10, margin: "14px 0 12px", color: "#aaa", fontSize: 13 },
+  shareHint:    { textAlign: "center", fontSize: 12, color: "#888", margin: "8px 0 0", lineHeight: 1.5 },
+  btnAddPlot:   { padding: "8px 14px", background: "#f0f4ff", color: "#0f1f3d", border: "1px solid #c0cfe8", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 },
   hazardBox:    { border: "1.5px solid #fde8c8", borderRadius: 10, padding: "14px 14px 12px", marginBottom: 18, background: "#fffaf4" },
   hazardGrid:   { display: "flex", flexDirection: "column", gap: 10 },
   hazardBtn:    { display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", cursor: "pointer", fontSize: 15, color: "#444", textAlign: "left" },
@@ -581,14 +701,16 @@ const S = {
   hazardCheck:  { width: 20, height: 20, borderRadius: 4, border: "1.5px solid #ccc", background: "#f5f5f5", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#c9922a", fontWeight: 700, flexShrink: 0 },
   hazardCheckOn:{ border: "1.5px solid #c9922a", background: "#fff3d6" },
   subLabel:     { fontSize: 11, fontWeight: 700, color: "#888", letterSpacing: "0.4px", marginBottom: 4 },
-  roadBox:  { border: "1.5px solid #c8dff0", borderRadius: 10, padding: "14px 14px 12px", marginBottom: 18, background: "#eef5fb" },
-  rateBox:  { border: "1.5px solid #e0e8f0", borderRadius: 10, padding: "14px 14px 10px", marginBottom: 18, background: "#f8fbff" },
-  rateTitle:{ fontSize: 13, fontWeight: 700, color: "#0f1f3d", marginBottom: 12 },
-  rateRow:  { display: "flex", gap: 12 },
-  unit:     { fontWeight: 400, color: "#888", fontSize: 11 },
-  btnRemovePlot: { padding: "10px 12px", background: "#fff0f0", color: "#c0392b", border: "1px solid #f5c6c6", borderRadius: 7, cursor: "pointer", fontSize: 13, flexShrink: 0 },
-  errorBox: { background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 8, padding: "12px 16px", marginBottom: 16, color: "#7a5000", fontSize: 14 },
-  photoGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 },
-  photoThumb: { position: "relative", aspectRatio: "1", borderRadius: 6, overflow: "hidden", border: "1px solid #ddd" },
-  photoRemove: { position: "absolute", top: 3, right: 3, background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center" },
+  roadBox:      { border: "1.5px solid #c8dff0", borderRadius: 10, padding: "14px 14px 12px", marginBottom: 18, background: "#eef5fb" },
+  rateBox:      { border: "1.5px solid #e0e8f0", borderRadius: 10, padding: "14px 14px 10px", marginBottom: 18, background: "#f8fbff" },
+  rateTitle:    { fontSize: 13, fontWeight: 700, color: "#0f1f3d", marginBottom: 12 },
+  rateRow:      { display: "flex", gap: 12 },
+  unit:         { fontWeight: 400, color: "#888", fontSize: 11 },
+  btnRemovePlot:{ padding: "10px 12px", background: "#fff0f0", color: "#c0392b", border: "1px solid #f5c6c6", borderRadius: 7, cursor: "pointer", fontSize: 13, flexShrink: 0 },
+  errorBox:     { background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 8, padding: "12px 16px", marginBottom: 16, color: "#7a5000", fontSize: 14 },
+  photoGrid:    { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 },
+  photoThumb:   { position: "relative", aspectRatio: "1", borderRadius: 6, overflow: "hidden", border: "1px solid #ddd" },
+  photoRemove:  { position: "absolute", top: 3, right: 3, background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center" },
+  pendingBadge: { background: "#e8f4fd", border: "1px solid #bee3f8", borderRadius: 8, padding: "10px 16px", margin: "12px 0", color: "#0f1f3d", fontSize: 13, fontWeight: 600 },
+  syncToast:    { position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", background: "#1a7a3f", color: "#fff", padding: "12px 24px", borderRadius: 10, fontSize: 14, fontWeight: 700, zIndex: 9999, boxShadow: "0 4px 16px rgba(0,0,0,0.2)", whiteSpace: "nowrap" },
 };
