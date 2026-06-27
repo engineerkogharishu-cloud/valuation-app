@@ -1538,7 +1538,7 @@ app.post("/api/admin/credits/assign", auth(["super_user"]), express.json(), asyn
     if (!company_code || typeof amount !== "number" || amount <= 0)
       return res.status(400).json({ error: "company_code and positive amount are required" });
 
-    const company = await dbGet("SELECT credit_balance FROM companies WHERE company_code=?", [company_code.toUpperCase()]);
+    const company = await dbGet("SELECT credit_balance, company_name, contact_email FROM companies WHERE company_code=?", [company_code.toUpperCase()]);
     if (!company) return res.status(404).json({ error: "Company not found" });
 
     const before = company.credit_balance || 0;
@@ -1552,6 +1552,11 @@ app.post("/api/admin/credits/assign", auth(["super_user"]), express.json(), asyn
 
     await dbRun(`UPDATE companies SET ${updates.join(", ")} WHERE company_code=?`, params);
     await recordCreditTx(company_code.toUpperCase(), req.user.userId, req.user.username, "assign", amount, before, after, null, null, note || `Assigned by super admin`);
+
+    // Send credits notification email
+    if (company.contact_email) {
+      sendCreditsAssignedEmail(company.contact_email, company.company_name, company.company_name, amount, after, note || null);
+    }
 
     res.json({ message: "Credits assigned", balance: after });
   } catch (err) { handleError(res, err, "POST /api/admin/credits/assign"); }
@@ -1656,15 +1661,35 @@ app.post("/api/credits/deduct", auth(["admin", "user"]), express.json(), async (
   } catch (err) { handleError(res, err, "POST /api/credits/deduct"); }
 });
 
-// ── Email (nodemailer) ────────────────────────────────────────────────────────
+// ── Email (Resend via SMTP or fallback to custom SMTP) ───────────────────────
 let mailer = null;
-if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const FROM_NAME  = process.env.EMAIL_FROM_NAME  || "One Degree Consultant";
+const FROM_EMAIL = process.env.EMAIL_FROM       || "noreply@onedegree.com.np";
+
+if (RESEND_API_KEY) {
+  // Resend SMTP bridge
+  mailer = nodemailer.createTransport({
+    host: "smtp.resend.com",
+    port: 465,
+    secure: true,
+    auth: { user: "resend", pass: RESEND_API_KEY },
+  });
+  console.log("✉️  Email: using Resend SMTP");
+} else if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
   mailer = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || "587"),
     secure: process.env.SMTP_SECURE === "true",
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
+  console.log("✉️  Email: using custom SMTP");
+} else {
+  console.warn("⚠️  Email not configured — set RESEND_API_KEY in .env");
+}
+
+function emailFrom() {
+  return `"${FROM_NAME}" <${FROM_EMAIL}>`;
 }
 
 // ── Registration emails ───────────────────────────────────────────────────────
@@ -1673,7 +1698,7 @@ async function sendRegistrationReceivedEmail(toEmail, contactName, companyName) 
   if (!mailer || !toEmail) return false;
   try {
     await mailer.sendMail({
-      from: `"${process.env.SMTP_FROM_NAME || "One Degree Consultant"}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      from: emailFrom(),
       to: toEmail,
       subject: "Registration Request Received — Valuation System",
       html: `
@@ -1731,7 +1756,7 @@ async function sendRegistrationApprovedEmail(toEmail, contactName, companyName, 
   if (!mailer || !toEmail) return false;
   try {
     await mailer.sendMail({
-      from: `"${process.env.SMTP_FROM_NAME || "One Degree Consultant"}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      from: emailFrom(),
       to: toEmail,
       subject: `✅ Your Account is Ready — ${companyName}`,
       html: `
@@ -1814,7 +1839,7 @@ async function sendFeedbackApprovalEmail(toEmail, toName, feedbackMessage) {
   if (!mailer || !toEmail) return false;
   try {
     await mailer.sendMail({
-      from: `"${process.env.SMTP_FROM_NAME || "One Degree Consultant"}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      from: emailFrom(),
       to: toEmail,
       subject: "Thank You for Your Feedback — 1 Credit Awarded!",
       html: `
@@ -1859,6 +1884,82 @@ async function sendFeedbackApprovalEmail(toEmail, toName, feedbackMessage) {
     return false;
   }
 }
+
+// ── Credits assigned email ────────────────────────────────────────────────────
+async function sendCreditsAssignedEmail(toEmail, contactName, companyName, creditsAdded, newBalance, note) {
+  if (!mailer || !toEmail) return false;
+  try {
+    await mailer.sendMail({
+      from: emailFrom(),
+      to: toEmail,
+      subject: `🪙 ${creditsAdded} Credits Added — ${companyName}`,
+      html: `
+        <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e0e4ea;box-shadow:0 4px 24px rgba(0,0,0,0.07)">
+          <div style="background:linear-gradient(135deg,#1a5c3a 0%,#27ae60 100%);padding:30px 34px;color:#fff">
+            <div style="font-size:36px;margin-bottom:8px">🪙</div>
+            <h1 style="margin:0;font-size:21px;font-weight:800">Credits Added to Your Account</h1>
+            <p style="margin:6px 0 0;opacity:0.75;font-size:13px">One Degree Consultant Pvt. Ltd. — Valuation System</p>
+          </div>
+          <div style="padding:30px 34px">
+            <p style="font-size:15px;color:#1a202c;margin:0 0 14px;line-height:1.6">Dear <strong>${contactName || companyName}</strong>,</p>
+            <p style="font-size:14px;color:#4a5568;line-height:1.7;margin:0 0 22px">
+              We are pleased to inform you that <strong>${creditsAdded} credit${creditsAdded !== 1 ? "s" : ""}</strong> have been added to your company account <strong>${companyName}</strong>.
+            </p>
+            <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:12px;padding:22px 26px;margin:0 0 22px;border:1.5px solid #86efac;display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-size:11px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px">Credits Added</div>
+                <div style="font-size:32px;font-weight:900;color:#15803d">+${creditsAdded}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:11px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px">New Balance</div>
+                <div style="font-size:28px;font-weight:900;color:#0f1f3d">${newBalance}</div>
+              </div>
+            </div>
+            ${note ? `<div style="background:#f8fafc;border-radius:8px;padding:14px 18px;margin:0 0 20px;border-left:4px solid #1a73e8;font-size:13px;color:#2d3748"><strong>Note from admin:</strong> ${note}</div>` : ""}
+            <p style="font-size:13px;color:#718096;line-height:1.6;margin:0 0 24px">
+              Each credit allows you to generate one valuation report. Log in to your dashboard to use your credits.
+            </p>
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px">
+            <p style="font-size:12px;color:#a0aec0;margin:0">
+              <strong style="color:#4a5568">One Degree Consultant Pvt. Ltd.</strong><br>
+              <a href="mailto:onedegreeconsultant@gmail.com" style="color:#1a73e8;text-decoration:none">onedegreeconsultant@gmail.com</a> &nbsp;·&nbsp; 9841357433
+            </p>
+          </div>
+        </div>`,
+    });
+    return true;
+  } catch (e) {
+    console.error("Credits email failed:", e.message);
+    return false;
+  }
+}
+
+// ── Mass email (super admin broadcast) ────────────────────────────────────────
+app.post("/api/admin/email/broadcast", auth(["super_user"]), express.json(), async (req, res) => {
+  try {
+    const { subject, html, target } = req.body;
+    if (!subject || !html) return res.status(400).json({ error: "subject and html are required" });
+    if (!mailer) return res.status(503).json({ error: "Email not configured — set RESEND_API_KEY in server environment" });
+
+    // Get all company admin emails
+    let companies;
+    if (target === "all") {
+      companies = await dbAll("SELECT company_name, contact_email FROM companies WHERE contact_email != '' AND contact_email IS NOT NULL");
+    } else {
+      companies = await dbAll("SELECT company_name, contact_email FROM companies WHERE company_code=? AND contact_email != ''", [target]);
+    }
+    if (!companies.length) return res.status(404).json({ error: "No email recipients found" });
+
+    let sent = 0; let failed = 0;
+    for (const co of companies) {
+      try {
+        await mailer.sendMail({ from: emailFrom(), to: co.contact_email, subject, html });
+        sent++;
+      } catch (_) { failed++; }
+    }
+    res.json({ message: `Broadcast complete`, sent, failed, total: companies.length });
+  } catch (err) { handleError(res, err, "POST /api/admin/email/broadcast"); }
+});
 
 // ── Feedback ──────────────────────────────────────────────────────────────────
 

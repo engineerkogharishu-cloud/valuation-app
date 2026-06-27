@@ -730,6 +730,91 @@ function RateMapAccessAdmin({ companies }) {
   );
 }
 
+// ── Mass / Broadcast Email ────────────────────────────────────
+function BroadcastEmail({ companies }) {
+  const [subject, setSubject] = useState("");
+  const [body, setBody]       = useState("");
+  const [target, setTarget]   = useState("all");
+  const [sending, setSending] = useState(false);
+  const [result, setResult]   = useState(null);
+
+  const send = async () => {
+    if (!subject.trim() || !body.trim()) return alert("Subject and message are required.");
+    if (!window.confirm(`Send to ${target === "all" ? "ALL companies" : target}?`)) return;
+    setSending(true); setResult(null);
+    try {
+      // Wrap plain text body in basic HTML
+      const html = `<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:580px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e0e4ea;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#0f1f3d,#1a3a6b);padding:28px 32px;color:#fff">
+          <h1 style="margin:0;font-size:20px;font-weight:800">${subject}</h1>
+          <p style="margin:6px 0 0;opacity:0.7;font-size:12px">One Degree Consultant Pvt. Ltd. — Valuation System</p>
+        </div>
+        <div style="padding:28px 32px;font-size:14px;color:#2d3748;line-height:1.8;white-space:pre-wrap">${body.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+        <div style="padding:16px 32px;border-top:1px solid #e2e8f0;font-size:12px;color:#aaa">
+          One Degree Consultant Pvt. Ltd. &nbsp;|&nbsp; onedegreeconsultant@gmail.com &nbsp;|&nbsp; 9841357433
+        </div>
+      </div>`;
+      const d = await api.broadcastEmail(subject, html, target);
+      setResult({ ok: true, msg: `✓ Sent: ${d.sent}, Failed: ${d.failed}, Total: ${d.total}` });
+      setSubject(""); setBody("");
+    } catch (e) {
+      setResult({ ok: false, msg: "❌ " + e.message });
+    } finally { setSending(false); }
+  };
+
+  const C2 = { navy: "#0f1f3d", border: "#dde1e7", muted: "#8a97aa" };
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${C2.border}`, padding: "24px 28px", marginBottom: 20 }}>
+        <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: C2.navy }}>📧 Mass Email Broadcast</h2>
+        <p style={{ margin: "0 0 20px", fontSize: 13, color: C2.muted }}>Send a message to all registered companies or a specific one.</p>
+
+        {/* Target */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: C2.muted, textTransform: "uppercase", display: "block", marginBottom: 6 }}>Send To</label>
+          <select value={target} onChange={e => setTarget(e.target.value)}
+            style={{ padding: "9px 12px", border: `1.5px solid ${C2.border}`, borderRadius: 8, fontSize: 13, width: "100%", boxSizing: "border-box" }}>
+            <option value="all">All Companies</option>
+            {(companies || []).filter(c => c.contact_email).map(c => (
+              <option key={c.company_code} value={c.company_code}>{c.company_name} ({c.contact_email})</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Subject */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: C2.muted, textTransform: "uppercase", display: "block", marginBottom: 6 }}>Subject</label>
+          <input type="text" value={subject} onChange={e => setSubject(e.target.value)} placeholder="Email subject..."
+            style={{ padding: "9px 12px", border: `1.5px solid ${C2.border}`, borderRadius: 8, fontSize: 13, width: "100%", boxSizing: "border-box" }} />
+        </div>
+
+        {/* Body */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: C2.muted, textTransform: "uppercase", display: "block", marginBottom: 6 }}>Message</label>
+          <textarea value={body} onChange={e => setBody(e.target.value)} rows={10} placeholder="Write your message here..."
+            style={{ padding: "10px 12px", border: `1.5px solid ${C2.border}`, borderRadius: 8, fontSize: 13, width: "100%", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit" }} />
+        </div>
+
+        <button onClick={send} disabled={sending}
+          style={{ padding: "11px 28px", background: GRAD.navy, color: "#fff", border: "none", borderRadius: 9, fontWeight: 700, fontSize: 14, cursor: sending ? "not-allowed" : "pointer", opacity: sending ? 0.7 : 1 }}>
+          {sending ? "Sending…" : "📤 Send Email"}
+        </button>
+
+        {result && (
+          <div style={{ marginTop: 14, padding: "10px 16px", borderRadius: 8, background: result.ok ? "#f0fdf4" : "#fff5f5", border: `1px solid ${result.ok ? "#86efac" : "#fca5a5"}`, color: result.ok ? "#166534" : "#c0392b", fontSize: 13, fontWeight: 600 }}>
+            {result.msg}
+          </div>
+        )}
+      </div>
+
+      {/* Email config status */}
+      <div style={{ background: "#fff8e1", border: "1px solid #f6d860", borderRadius: 10, padding: "12px 18px", fontSize: 12, color: "#78580a" }}>
+        <strong>⚙️ Email Config:</strong> Set <code>RESEND_API_KEY</code> and <code>EMAIL_FROM</code> in your server environment (.env / Railway variables) to enable sending.
+      </div>
+    </div>
+  );
+}
+
 // ── Registration Requests Panel ───────────────────────────────
 function RegistrationsPanel({ onCountChange }) {
   const [requests, setRequests] = useState([]);
@@ -1084,6 +1169,7 @@ export default function SuperUserDashboard({ user, onLogout }) {
     ["ratemap",       "🗺️", "Rate Map Access"],
     ["registrations", "📝", "Registrations", pendingRegCount],
     ["feedback",      "💬", "Feedback"],
+    ["broadcast",     "📧", "Mass Email"],
     ["map",           "🗺",  "Map"],
   ];
 
@@ -1580,6 +1666,9 @@ export default function SuperUserDashboard({ user, onLogout }) {
 
         {/* ══════════════ Feedback Tab ══════════════ */}
         {tab === "feedback" && <FeedbackAdmin companies={companies} />}
+
+        {/* ══════════════ Mass Email Tab ══════════════ */}
+        {tab === "broadcast" && <BroadcastEmail companies={companies} />}
 
         {/* ══════════════ Map Tab ══════════════ */}
         {tab === "map" && (

@@ -224,4 +224,8 @@ export const api = {
 
   getCreditHistory: (company_code) =>
     request(`/admin/credits/${company_code}/history`),
+
+  // Super Admin broadcast email
+  broadcastEmail: (subject, html, target = "all") =>
+    request("/admin/email/broadcast", { method: "POST", body: JSON.stringify({ subject, html, target }) }),
 };
