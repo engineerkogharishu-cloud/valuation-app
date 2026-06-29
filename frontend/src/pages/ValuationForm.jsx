@@ -950,8 +950,9 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
   const totalFMVLand = properties.filter(p=>mortgagedIds.has(p.id)).reduce((s,p)=>s+getFMVLandValueRounded(p.id),0);
 
   const mortgaged = properties.filter(p => mortgagedIds.has(p.id));
-  const valAllBkd = mortgaged.length > 0 && mortgaged.every(p => p.areaUnit === "bkd");
-  const valAnyBkd = mortgaged.some(p => p.areaUnit === "bkd");
+  const _isBkdRateProp = (p) => p.areaUnit === "bkd" || (p.areaUnit === "sqm" && p.rateSystem === "bkd");
+  const valAllBkd = mortgaged.length > 0 && mortgaged.every(p => _isBkdRateProp(p));
+  const valAnyBkd = mortgaged.some(p => _isBkdRateProp(p));
   const valUnitHdr   = valAllBkd ? "Dhur" : valAnyBkd ? "Aana / Dhur" : "Aana";
   const valNativeHdr = valAllBkd ? "B-K-D" : valAnyBkd ? "Native" : "R-A-P-D";
 
@@ -1491,12 +1492,26 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                           style={{flex:1}}/>
                         <span className="unit-badge">sq.m</span>
                       </div>
+                      <div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"8px"}}>
+                        <span style={{fontSize:"12px",color:"var(--text-3)",fontWeight:600}}>Rate system:</span>
+                        {[["radp","R-A-P-D (Anna)"],["bkd","B-K-D (Dhur)"]].map(([val,lbl])=>(
+                          <button key={val} type="button"
+                            onClick={()=>updateProperty(prop.id,{...prop,rateSystem:val})}
+                            style={{padding:"3px 10px",fontSize:"12px",fontWeight:600,borderRadius:"5px",cursor:"pointer",border:"1.5px solid",
+                              background:(prop.rateSystem||"radp")===val?"#1a3a6e":"#f5f5f5",
+                              color:(prop.rateSystem||"radp")===val?"#fff":"#555",
+                              borderColor:(prop.rateSystem||"radp")===val?"#1a3a6e":"#d0d0d0"}}>
+                            {lbl}
+                          </button>
+                        ))}
+                      </div>
                       {propAreaSqm(prop) > 0 && (()=>{
-                        const {r,a,p,d} = sqmToRadp(propAreaSqm(prop));
+                        const sqm = propAreaSqm(prop);
+                        const isBkdRate = (prop.rateSystem||"radp") === "bkd";
                         return (
                           <div className="area-equiv">
-                            ≈ {r}-{a}-{p}-{d} (R-A-P-D) &nbsp;|&nbsp;
-                            {sqmToAana(propAreaSqm(prop)).toFixed(4)} Aana
+                            {isBkdRate ? (()=>{ const x=sqmToBkd(sqm); return `≈ ${x.b}-${Math.floor(x.k)}-${x.d.toFixed(2)} (B-K-D) | ${sqmToDhur(sqm).toFixed(3)} Dhur`; })()
+                              : (()=>{ const {r,a,p,d}=sqmToRadp(sqm); return `≈ ${r}-${a}-${p}-${d} (R-A-P-D) | ${sqmToAana(sqm).toFixed(4)} Aana`; })()}
                           </div>
                         );
                       })()}

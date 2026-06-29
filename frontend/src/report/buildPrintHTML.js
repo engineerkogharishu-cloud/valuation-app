@@ -30,10 +30,11 @@ function areaDisplay(prop) {
   const { r,a,p,d } = prop.areaRadp||{};
   return `${r||0}-${a||0}-${p||0}-${d||0} (R-A-P-D)`;
 }
-const _uf  = (p) => p.areaUnit === "bkd" ? DHUR_TO_SQM : AANA_TO_SQM;
-const _ul  = (p) => p.areaUnit === "bkd" ? "Dhur" : "Aana";
-const _ud  = (p, sqm) => p.areaUnit === "bkd" ? sqmToDhur(sqm).toFixed(3) : sqmToAana(sqm).toFixed(4);
-const _uda = (p, sqm) => p.areaUnit === "bkd" ? sqmToDhur(sqm) : sqmToAana(sqm);
+const _isBkdRate = (p) => p.areaUnit === "bkd" || (p.areaUnit === "sqm" && p.rateSystem === "bkd");
+const _uf  = (p) => _isBkdRate(p) ? DHUR_TO_SQM : AANA_TO_SQM;
+const _ul  = (p) => _isBkdRate(p) ? "Dhur" : "Aana";
+const _ud  = (p, sqm) => _isBkdRate(p) ? sqmToDhur(sqm).toFixed(3) : sqmToAana(sqm).toFixed(4);
+const _uda = (p, sqm) => _isBkdRate(p) ? sqmToDhur(sqm) : sqmToAana(sqm);
 const _nativeStr = (p, sqm) => {
   if (p.areaUnit === "bkd") { const x=sqmToBkd(sqm); return `${x.b}-${x.k}-${parseFloat(x.d).toFixed(3)}`; }
   const x=sqmToRadp(sqm); return `${x.r}-${x.a}-${x.p}-${x.d}`;
@@ -77,8 +78,8 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
   }).filter(Boolean).join(", ")||"—";
 
   const mortProps = (s.properties||[]).filter(p=>(s.mortgagedIds||[]).includes(p.id));
-  const allBkdMort = mortProps.length > 0 && mortProps.every(p => p.areaUnit === "bkd");
-  const anyBkdMort = mortProps.some(p => p.areaUnit === "bkd");
+  const allBkdMort = mortProps.length > 0 && mortProps.every(p => _isBkdRate(p));
+  const anyBkdMort = mortProps.some(p => _isBkdRate(p));
   const nativeHdr = allBkdMort ? "B-K-D" : anyBkdMort ? "R-A-P-D / B-K-D" : "R-A-P-D";
   const unitHdr = allBkdMort ? "Dhur" : anyBkdMort ? "Aana / Dhur" : "Aana";
 

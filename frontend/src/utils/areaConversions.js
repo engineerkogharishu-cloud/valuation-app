@@ -66,10 +66,16 @@ export function areaDisplay(prop) {
 
 // Unit factor for rate calculation (sqm per rate unit)
 export function rateUnitFactor(prop) {
-  return (prop && prop.areaUnit === "bkd") ? DHUR_TO_SQM : AANA_TO_SQM;
+  if (!prop) return AANA_TO_SQM;
+  if (prop.areaUnit === "bkd") return DHUR_TO_SQM;
+  if (prop.areaUnit === "sqm" && prop.rateSystem === "bkd") return DHUR_TO_SQM;
+  return AANA_TO_SQM;
 }
 
 // Rate unit label
 export function rateUnitLabel(prop) {
-  return (prop && prop.areaUnit === "bkd") ? "Dhur" : "Anna";
+  if (!prop) return "Anna";
+  if (prop.areaUnit === "bkd") return "Dhur";
+  if (prop.areaUnit === "sqm" && prop.rateSystem === "bkd") return "Dhur";
+  return "Anna";
 }
