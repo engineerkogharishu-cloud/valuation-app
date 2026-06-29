@@ -119,59 +119,71 @@ const GROUP_META = {
   custom:   { label: "Custom",   color: "#374151", bg: "#f3f4f6" },
 };
 
-function MissingDocumentPanel({ clients, owners, hasBuilding, properties }) {
-  const [checks, setChecks] = React.useState({}); // { [label]: true/false }
+// Status values: "available" | "not_required" | "ask_client" (default when unset)
+const DOC_STATUSES = [
+  { value: "available",    label: "✓ Available",    bg: "#27ae60", border: "#27ae60", textBg: "#f0fdf4", textColor: "#1a5c3a" },
+  { value: "not_required", label: "Not Required",   bg: "#7f8c8d", border: "#7f8c8d", textBg: "#f5f5f5", textColor: "#444" },
+  { value: "ask_client",   label: "Have to Ask",    bg: "#e67e22", border: "#e67e22", textBg: "#fffbea", textColor: "#7a3c00" },
+];
+
+function MissingDocumentPanel({ clients, owners, hasBuilding, properties, docChecks, setDocChecks, customDocLabels, setCustomDocLabels }) {
   const [collapsed, setCollapsed] = React.useState(false);
   const [newText, setNewText] = React.useState("");
-  const [customDocs, setCustomDocs] = React.useState([]); // extra labels added by user
-  const nextId = React.useRef(1000);
 
   const defaultDocs = React.useMemo(
     () => buildDefaultDocs(clients, owners, hasBuilding, properties),
     [clients, owners, hasBuilding, properties]
   );
 
-  const allDocs = [
-    ...defaultDocs,
-    ...customDocs.map(label => ({ id: nextId.current++, label, available: false, group: "custom", custom: true })),
+  const safeDocs = customDocLabels || [];
+
+  const allLabels = [
+    ...defaultDocs.map(d => d.label),
+    ...safeDocs,
   ];
 
-  // Re-map available state from checks map
-  const docs = allDocs.map(d => ({ ...d, available: !!checks[d.label] }));
+  const getStatus = (label) => (docChecks || {})[label] || "ask_client";
 
-  const toggle = (label) => setChecks(prev => ({ ...prev, [label]: !prev[label] }));
+  const setStatus = (label, status) => {
+    setDocChecks(prev => ({ ...(prev || {}), [label]: status }));
+  };
 
   const addDoc = () => {
     const text = newText.trim();
-    if (!text || customDocs.includes(text)) return;
-    setCustomDocs(prev => [...prev, text]);
+    if (!text || allLabels.includes(text)) return;
+    setCustomDocLabels(prev => [...(prev || []), text]);
     setNewText("");
   };
 
   const removeCustom = (label) => {
-    setCustomDocs(prev => prev.filter(l => l !== label));
-    setChecks(prev => { const n = { ...prev }; delete n[label]; return n; });
+    setCustomDocLabels(prev => (prev || []).filter(l => l !== label));
+    setDocChecks(prev => { const n = { ...(prev || {}) }; delete n[label]; return n; });
   };
 
-  const missing = docs.filter(d => !d.available);
-  const availableCount = docs.filter(d => d.available).length;
+  // Build per-group label lists
+  const docsByGroup = {};
+  defaultDocs.forEach(d => {
+    if (!docsByGroup[d.group]) docsByGroup[d.group] = [];
+    docsByGroup[d.group].push(d.label);
+  });
+  if (safeDocs.length > 0) docsByGroup.custom = safeDocs;
 
-  // Group docs for rendering
+  const askClientDocs = allLabels.filter(l => getStatus(l) === "ask_client");
+  const availableCount = allLabels.filter(l => getStatus(l) === "available").length;
+
   const groupOrder = ["client", "owner", "land", "company", "building", "custom"];
-  const grouped = groupOrder.map(g => ({ g, items: docs.filter(d => d.group === g) })).filter(x => x.items.length > 0);
 
   return (
     <div style={{ background: "#fff", border: "1.5px solid #dde1e7", borderRadius: 12, overflow: "hidden" }}>
-      {/* Header */}
       <div
         onClick={() => setCollapsed(c => !c)}
         style={{ background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff", padding: "10px 18px", fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", userSelect: "none" }}
       >
-        <span>📂 Missing Documents</span>
+        <span>📂 Document Status</span>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>
-            {availableCount}/{docs.length} available
-            {missing.length > 0 && <span style={{ marginLeft: 8, background: "rgba(255,255,255,0.25)", borderRadius: 10, padding: "1px 8px" }}>⚠ {missing.length} missing</span>}
+            {availableCount}/{allLabels.length} available
+            {askClientDocs.length > 0 && <span style={{ marginLeft: 8, background: "rgba(255,255,255,0.25)", borderRadius: 10, padding: "1px 8px" }}>⚠ {askClientDocs.length} to ask</span>}
           </span>
           <span style={{ fontSize: 16, opacity: 0.8 }}>{collapsed ? "▶" : "▼"}</span>
         </div>
@@ -179,9 +191,8 @@ function MissingDocumentPanel({ clients, owners, hasBuilding, properties }) {
 
       {!collapsed && (
         <div style={{ padding: "16px 18px" }}>
-          {/* Grouped document list */}
           <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 16 }}>
-            {grouped.map(({ g, items }) => {
+            {groupOrder.filter(g => docsByGroup[g]?.length > 0).map(g => {
               const meta = GROUP_META[g] || GROUP_META.custom;
               return (
                 <div key={g}>
@@ -189,34 +200,37 @@ function MissingDocumentPanel({ clients, owners, hasBuilding, properties }) {
                     {meta.label} Documents
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {items.map(doc => (
-                      <div key={doc.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${doc.available ? "#27ae60" : "#f39c12"}`, background: doc.available ? "#f0fdf4" : "#fffbea" }}>
-                        <input
-                          type="checkbox"
-                          checked={doc.available}
-                          onChange={() => toggle(doc.label)}
-                          style={{ width: 16, height: 16, accentColor: "#27ae60", cursor: "pointer", flexShrink: 0 }}
-                        />
-                        <span style={{ flex: 1, fontSize: 13, color: doc.available ? "#1a5c3a" : "#7a5c00", fontWeight: doc.available ? 500 : 400 }}>
-                          {doc.label}
-                        </span>
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: doc.available ? "#27ae60" : "#f39c12", color: "#fff", whiteSpace: "nowrap" }}>
-                          {doc.available ? "✓ Available" : "⚠ Ask Client"}
-                        </span>
-                        {doc.custom && (
-                          <button onClick={() => removeCustom(doc.label)}
-                            style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
-                            title="Remove">×</button>
-                        )}
-                      </div>
-                    ))}
+                    {(docsByGroup[g] || []).map(label => {
+                      const status = getStatus(label);
+                      const si = DOC_STATUSES.find(s => s.value === status) || DOC_STATUSES[2];
+                      const isCustom = safeDocs.includes(label);
+                      return (
+                        <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${si.border}`, background: si.textBg }}>
+                          <span style={{ flex: 1, fontSize: 13, color: si.textColor, fontWeight: status === "available" ? 500 : 400 }}>
+                            {label}
+                          </span>
+                          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                            {DOC_STATUSES.map(s => (
+                              <button key={s.value} onClick={() => setStatus(label, s.value)}
+                                style={{ padding: "3px 9px", fontSize: 11, fontWeight: 700, borderRadius: 8, border: `1.5px solid ${s.bg}`, background: status === s.value ? s.bg : "#fff", color: status === s.value ? "#fff" : s.bg, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.12s" }}>
+                                {s.label}
+                              </button>
+                            ))}
+                          </div>
+                          {isCustom && (
+                            <button onClick={() => removeCustom(label)}
+                              style={{ background: "none", border: "none", color: "#e74c3c", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
+                              title="Remove">×</button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* Add custom document */}
           <div style={{ display: "flex", gap: 8 }}>
             <input
               type="text" value={newText}
@@ -231,13 +245,12 @@ function MissingDocumentPanel({ clients, owners, hasBuilding, properties }) {
             </button>
           </div>
 
-          {/* Missing summary */}
-          {missing.length > 0 && (
-            <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "#fff8e1", border: "1.5px solid #f39c12" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#7a5c00", marginBottom: 5 }}>📋 Documents to Request from Client:</div>
+          {askClientDocs.length > 0 && (
+            <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "#fff8e1", border: "1.5px solid #e67e22" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#7a3c00", marginBottom: 5 }}>📋 Documents to Request from Client/Bank:</div>
               <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {missing.map(d => (
-                  <li key={d.label} style={{ fontSize: 12, color: "#7a5c00", marginBottom: 2 }}>{d.label}</li>
+                {askClientDocs.map(l => (
+                  <li key={l} style={{ fontSize: 12, color: "#7a3c00", marginBottom: 2 }}>{l}</li>
                 ))}
               </ul>
             </div>
@@ -427,6 +440,7 @@ export default function ReportSection({
   finalFMV,
   bank,
   clients, owners, hasBuilding, properties,
+  docChecks, setDocChecks, customDocLabels, setCustomDocLabels,
 }) {
   const [html, setHtml] = React.useState(null);
   const [fullHtml, setFullHtml] = React.useState(null);
@@ -723,7 +737,9 @@ export default function ReportSection({
       </div>
 
       {/* ── Missing Document Checklist ── */}
-      <MissingDocumentPanel clients={clients} owners={owners} hasBuilding={hasBuilding} properties={properties} />
+      <MissingDocumentPanel clients={clients} owners={owners} hasBuilding={hasBuilding} properties={properties}
+        docChecks={docChecks} setDocChecks={setDocChecks}
+        customDocLabels={customDocLabels} setCustomDocLabels={setCustomDocLabels} />
 
       {/* ── Bill Summary Panel ── */}
       {reportType === "preliminary" && fieldChargeReceived !== null && (

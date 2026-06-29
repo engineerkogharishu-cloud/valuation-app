@@ -300,6 +300,8 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
   const [editingPhoto, setEditingPhoto] = useState(null); // { id, dataUrl } | null
   const [sitePlans, setSitePlans] = useState([]); // [{id, name, dataUrl}]
   const [legalDocs, setLegalDocs] = useState([]); // [{id, name, category, fileNo, date, issuedBy, remarks, dataUrl}] // [{id, caption, dataUrl}]
+  const [docChecks, setDocChecks] = useState({}); // { [label]: "available" | "not_required" | "ask_client" }
+  const [customDocLabels, setCustomDocLabels] = useState([]); // extra doc labels added by user
   const [viewerDoc, setViewerDoc] = useState(null); // { id, dataUrl, name } | null
   const [viewerRotation, setViewerRotation] = useState(0);
   // PDF viewer
@@ -467,7 +469,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
   }, [bank, branch, visitDate, reportDate, reportType, clients, owners, properties,
       buildings, hasBuilding, mortgagedIds, areaMeasured, deductions, rates,
       plotRateSplits, access, roadAccess, buildingVals, commercialPct, distressPct,
-      govValues, remarks, limitingConditions, includeLimitingConditions, propDescriptions, photos, sitePlans, legalDocs,
+      govValues, remarks, limitingConditions, includeLimitingConditions, propDescriptions, photos, sitePlans, legalDocs, docChecks, customDocLabels,
       valuatorInfo, buildingDetails, customBanks,
       fieldChargeReceived, fieldChargeAmount, transportationCharge, billNo, includeVat, billRemarks,
       extraChargeLabel, extraChargeAmount]); // scheduleAutosave, collectState, getFileName are stable refs
@@ -515,7 +517,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
     mortgagedIds: [...mortgagedIds],
     areaMeasured, deductions, rates, plotRateSplits, access, roadAccess, buildingVals, extraBoundaryRows,
     commercialPct, distressPct, govValues, remarks, limitingConditions, includeLimitingConditions,
-    propDescriptions, photos, sitePlans, legalDocs, valuatorInfo,
+    propDescriptions, photos, sitePlans, legalDocs, docChecks, customDocLabels, valuatorInfo,
     buildingDetails,
     fieldChargeReceived, fieldChargeAmount, transportationCharge,
     billNo, includeVat, billRemarks, extraChargeLabel, extraChargeAmount, discountAmount, deductFieldVisit, billingSystem, billQrCode, amountReceived, receivedAt, receivedBank,
@@ -526,7 +528,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
     // in every report snapshot and prevent the super admin's changes from
     // taking effect on existing reports.
     customBanks,
-  }), [bank, branch, visitDate, reportDate, reportType, clients, owners, isBuySell, properties, buildings, hasBuilding, mortgagedIds, areaMeasured, deductions, rates, plotRateSplits, access, roadAccess, buildingVals, extraBoundaryRows, commercialPct, distressPct, govValues, remarks, limitingConditions, includeLimitingConditions, propDescriptions, photos, sitePlans, legalDocs, valuatorInfo, buildingDetails, customBanks, fieldChargeReceived, fieldChargeAmount, transportationCharge, billNo, includeVat, billRemarks, extraChargeLabel, extraChargeAmount, discountAmount, deductFieldVisit, billingSystem, billQrCode, amountReceived, receivedAt, receivedBank]);
+  }), [bank, branch, visitDate, reportDate, reportType, clients, owners, isBuySell, properties, buildings, hasBuilding, mortgagedIds, areaMeasured, deductions, rates, plotRateSplits, access, roadAccess, buildingVals, extraBoundaryRows, commercialPct, distressPct, govValues, remarks, limitingConditions, includeLimitingConditions, propDescriptions, photos, sitePlans, legalDocs, docChecks, customDocLabels, valuatorInfo, buildingDetails, customBanks, fieldChargeReceived, fieldChargeAmount, transportationCharge, billNo, includeVat, billRemarks, extraChargeLabel, extraChargeAmount, discountAmount, deductFieldVisit, billingSystem, billQrCode, amountReceived, receivedAt, receivedBank]);
 
   const handleSaveToDb = React.useCallback(async () => {
     setDbSaving(true);
@@ -698,6 +700,8 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
         remarks: doc.remarks||'', dataUrl: doc.dataUrl||'', rotation: doc.rotation||0,
         pdfPageRotations: doc.pdfPageRotations||[],
       })));
+      setDocChecks(d.docChecks || {});
+      setCustomDocLabels(d.customDocLabels || []);
       setValuatorInfo(d.valuatorInfo||{ name:'Er. Saakar Rimal', licenseNo:'11518 Civil "A"', company:'Neo-Civic Consulting (P). Ltd', phone:'', email:'' });
       setBuildingDetails(d.buildingDetails||{});
       if (d.fieldChargeReceived !== undefined) setFieldChargeReceived(d.fieldChargeReceived);
@@ -3717,6 +3721,10 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
           owners={owners}
           hasBuilding={hasBuilding}
           properties={properties}
+          docChecks={docChecks}
+          setDocChecks={setDocChecks}
+          customDocLabels={customDocLabels}
+          setCustomDocLabels={setCustomDocLabels}
         />
       ),
     },

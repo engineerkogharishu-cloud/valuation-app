@@ -554,6 +554,7 @@ const DATAHTML_RE = /data\s*:\s*text\/html/gi;
 function sanitizeStr(v) {
   if (typeof v !== "string") return v;
   if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,/i.test(v)) return v;
+  if (/^data:application\/pdf;base64,/i.test(v)) return v;
   return v
     .replace(SCRIPT_RE,   "")
     .replace(ALL_TAGS_RE, "")
