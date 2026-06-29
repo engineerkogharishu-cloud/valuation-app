@@ -166,6 +166,7 @@ export default function MobileCollectPage({ token, shortCode }) {
     landType: "", landCategory: "", ownershipType: "", faceDirection: "",
     landMarketRate: "", buildingRate: "", notes: "",
   });
+  const [isCompany, setIsCompany] = useState(false);
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
   // ── Plot numbers ──────────────────────────────────────────
@@ -223,6 +224,43 @@ export default function MobileCollectPage({ token, shortCode }) {
   const [customDocs,  setCustomDocs]  = useState([]);   // extra doc labels
   const [newDocText,  setNewDocText]  = useState("");
 
+  // Derives the full label list from current form state — used in both render and payload
+  const buildDocList = (clientName, ownerName, isCompanyFlag, hasBldg, extras) => {
+    const labels = [];
+    const client = clientName.trim();
+    const owner  = ownerName.trim();
+    // Person citizenship
+    if (client) {
+      if (owner && owner !== client) {
+        labels.push(`Citizenship of Client — ${client}`);
+      } else if (owner && owner === client) {
+        labels.push(`Citizenship — ${client} (Client & Owner)`);
+      } else {
+        labels.push(`Citizenship of Client — ${client}`);
+      }
+    }
+    if (owner && owner !== client) labels.push(`Citizenship of Owner — ${owner}`);
+    // Company docs
+    if (isCompanyFlag) {
+      labels.push("Company Registration");
+      labels.push("Company PAN");
+      labels.push("Company Tax Clearance");
+      labels.push("Share Lagat");
+    }
+    // Land docs
+    labels.push(
+      "Land Ownership Certificate (Lalpurja)", "Trace", "Tiro", "Charkilla",
+      "Field Book or Shresta", "Road Verification Letter", "Land Registration Paper"
+    );
+    // Guthi Raitani
+    if (form.ownershipType === "Guthi Raitani") labels.push("Guthi Raitani Letter");
+    // Building docs
+    if (hasBldg === "yes") labels.push("Building Ijajat (Asthai / Sthai)", "Building Nirman Sampanna", "Building Naksa");
+    // Custom
+    extras.forEach(l => labels.push(l));
+    return labels;
+  };
+
   const toggleDoc  = (label) => setDocChecks(prev => ({ ...prev, [label]: !prev[label] }));
   const addCustomDoc = () => {
     const t = newDocText.trim();
@@ -274,12 +312,7 @@ export default function MobileCollectPage({ token, shortCode }) {
 
   // ── Build payload ─────────────────────────────────────────
   const buildPayload = () => {
-    const allDocLabels = [
-      "Land Ownership Certificate (Lalpurja)", "Trace", "Tiro", "Charkilla",
-      "Field Book or Shresta", "Road Verification Letter", "Land Registration Paper",
-      ...(hasBuilding === "yes" ? ["Building Ijajat (Asthai / Sthai)", "Building Nirman Sampanna", "Building Naksa"] : []),
-      ...customDocs,
-    ];
+    const allDocLabels = buildDocList(form.clientName, form.ownerName, isCompany, hasBuilding, customDocs);
     const missingDocs = allDocLabels.filter(l => !docChecks[l]);
     const availableDocs = allDocLabels.filter(l => !!docChecks[l]);
     return {
@@ -330,7 +363,7 @@ export default function MobileCollectPage({ token, shortCode }) {
     setArea({ r: "", a: "", p: "", d: "" });
     setRoads([{ ...EMPTY_ROAD }]);
     setHasBuilding(null); setBuilding({ numFloors: "", structureType: "", foundationType: "", faceDirection: "", totalAreaSqft: "", remarks: "" }); setSpecs({ ...RCC_DEFAULTS });
-    setHazards(EMPTY_HAZARDS); setPhotos([]); setDocChecks({}); setCustomDocs([]); setNewDocText(""); setSubmitted(false); setSubmitError("");
+    setHazards(EMPTY_HAZARDS); setPhotos([]); setDocChecks({}); setCustomDocs([]); setNewDocText(""); setIsCompany(false); setSubmitted(false); setSubmitError("");
   };
 
   // ── Render ────────────────────────────────────────────────
@@ -711,28 +744,59 @@ export default function MobileCollectPage({ token, shortCode }) {
             Check each document that is <strong>available</strong>. Unchecked items will be flagged as missing.
           </p>
 
-          {/* Standard land docs */}
-          {[
-            "Land Ownership Certificate (Lalpurja)",
-            "Trace",
-            "Tiro",
-            "Charkilla",
-            "Field Book or Shresta",
-            "Road Verification Letter",
-            "Land Registration Paper",
-          ].map(label => (
-            <DocCheckRow key={label} label={label} checked={!!docChecks[label]} onToggle={() => toggleDoc(label)} />
-          ))}
+          {/* Company toggle */}
+          <button type="button" onClick={() => setIsCompany(v => !v)}
+            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", border: `1.5px solid ${isCompany ? "#b45309" : "#ddd"}`, borderRadius: 8, padding: "10px 12px", background: isCompany ? "#fef3c7" : "#f9fafb", cursor: "pointer", marginBottom: 14, textAlign: "left" }}>
+            <span style={{ width: 20, height: 20, borderRadius: 4, border: `1.5px solid ${isCompany ? "#b45309" : "#ccc"}`, background: isCompany ? "#b45309" : "#f5f5f5", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#fff", fontWeight: 700, flexShrink: 0 }}>
+              {isCompany ? "✓" : ""}
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: isCompany ? "#7c3a00" : "#555" }}>Client / Owner is a Company</span>
+          </button>
 
-          {/* Building docs — only if building present */}
-          {hasBuilding === "yes" && (
-            <>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#be185d", textTransform: "uppercase", margin: "12px 0 6px", letterSpacing: 0.4 }}>Building</div>
-              {["Building Ijajat (Asthai / Sthai)", "Building Nirman Sampanna", "Building Naksa"].map(label => (
-                <DocCheckRow key={label} label={label} checked={!!docChecks[label]} onToggle={() => toggleDoc(label)} />
-              ))}
-            </>
-          )}
+          {(() => {
+            const client = form.clientName.trim();
+            const owner  = form.ownerName.trim();
+
+            // Person / citizenship section
+            const personDocs = [];
+            if (client) {
+              if (owner && owner === client) personDocs.push(`Citizenship — ${client} (Client & Owner)`);
+              else { personDocs.push(`Citizenship of Client — ${client}`); if (owner) personDocs.push(`Citizenship of Owner — ${owner}`); }
+            } else if (owner) {
+              personDocs.push(`Citizenship of Owner — ${owner}`);
+            }
+
+            // Company docs
+            const companyDocs = isCompany ? ["Company Registration", "Company PAN", "Company Tax Clearance", "Share Lagat"] : [];
+
+            // Land docs
+            const landDocs = [
+              "Land Ownership Certificate (Lalpurja)", "Trace", "Tiro", "Charkilla",
+              "Field Book or Shresta", "Road Verification Letter", "Land Registration Paper",
+              ...(form.ownershipType === "Guthi Raitani" ? ["Guthi Raitani Letter"] : []),
+            ];
+
+            // Building docs
+            const buildingDocs = hasBuilding === "yes"
+              ? ["Building Ijajat (Asthai / Sthai)", "Building Nirman Sampanna", "Building Naksa"]
+              : [];
+
+            const sections = [
+              { label: "Person", color: "#1a73e8", docs: personDocs },
+              { label: "Company", color: "#b45309", docs: companyDocs },
+              { label: "Land", color: "#0f766e", docs: landDocs },
+              { label: "Building", color: "#be185d", docs: buildingDocs },
+            ].filter(s => s.docs.length > 0);
+
+            return sections.map(({ label, color, docs }) => (
+              <div key={label}>
+                <div style={{ fontSize: 11, fontWeight: 700, color, textTransform: "uppercase", margin: "10px 0 6px", letterSpacing: 0.4 }}>{label}</div>
+                {docs.map(lbl => (
+                  <DocCheckRow key={lbl} label={lbl} checked={!!docChecks[lbl]} onToggle={() => toggleDoc(lbl)} />
+                ))}
+              </div>
+            ));
+          })()}
 
           {/* Custom docs */}
           {customDocs.length > 0 && (
@@ -763,12 +827,7 @@ export default function MobileCollectPage({ token, shortCode }) {
 
           {/* Missing summary */}
           {(() => {
-            const allLabels = [
-              "Land Ownership Certificate (Lalpurja)", "Trace", "Tiro", "Charkilla",
-              "Field Book or Shresta", "Road Verification Letter", "Land Registration Paper",
-              ...(hasBuilding === "yes" ? ["Building Ijajat (Asthai / Sthai)", "Building Nirman Sampanna", "Building Naksa"] : []),
-              ...customDocs,
-            ];
+            const allLabels = buildDocList(form.clientName, form.ownerName, isCompany, hasBuilding, customDocs);
             const missing = allLabels.filter(l => !docChecks[l]);
             if (missing.length === 0) return <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "#e8f5e9", border: "1.5px solid #27ae60", color: "#1a5c3a", fontWeight: 700, fontSize: 13 }}>✅ All documents available</div>;
             return (
