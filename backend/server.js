@@ -354,6 +354,11 @@ async function initDb() {
     "ALTER TABLE companies ADD COLUMN payment_methods TEXT DEFAULT '[]'",
     // Valuation fee tiers (NRB schedule, configurable per company)
     "ALTER TABLE companies ADD COLUMN fee_tiers TEXT DEFAULT '[]'",
+    // Payment tracking for final reports
+    "ALTER TABLE reports ADD COLUMN amount_received REAL",
+    "ALTER TABLE reports ADD COLUMN received_by_user_id INTEGER",
+    "ALTER TABLE reports ADD COLUMN received_at TEXT",
+    "ALTER TABLE reports ADD COLUMN received_bank TEXT",
     // Field links (short codes for mobile data collection)
     `CREATE TABLE IF NOT EXISTS field_links (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1352,11 +1357,23 @@ app.put("/api/reports/:id", auth(), express.json({ limit: "50mb" }), async (req,
 
     const sanitized = deepSanitize(state);
     const meta = extractMeta(sanitized);
+
+    const isFinal = meta.report_type === "final";
+    const hasPayment = isFinal && sanitized.amountReceived !== undefined;
+    const amtReceived = hasPayment
+      ? (parseFloat(sanitized.amountReceived) || null)
+      : existing.amount_received ?? null;
+    const receivedBy = hasPayment ? req.user.userId : existing.received_by_user_id ?? null;
+    const receivedAt   = hasPayment ? (sanitized.receivedAt   || null) : existing.received_at   ?? null;
+    const receivedBank = hasPayment ? (sanitized.receivedBank || null) : existing.received_bank ?? null;
+
     await dbRun(
       `UPDATE reports SET filename=?, report_type=?, bank=?, branch=?, visit_date=?,
-        report_date=?, client_name=?, state_json=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+        report_date=?, client_name=?, state_json=?, amount_received=?, received_by_user_id=?,
+        received_at=?, received_bank=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
       [filename || existing.filename, meta.report_type, meta.bank, meta.branch, meta.visit_date,
-       meta.report_date, meta.client_name, JSON.stringify(sanitized), req.params.id]
+       meta.report_date, meta.client_name, JSON.stringify(sanitized),
+       amtReceived, receivedBy, receivedAt, receivedBank, req.params.id]
     );
     res.json({ message: "Report updated" });
   } catch (err) {
@@ -1496,9 +1513,12 @@ app.get("/api/admin/reports", auth(["admin", "super_user"]), async (req, res) =>
       SELECT r.id, r.filename, r.report_type, r.bank, r.branch,
              r.visit_date, r.report_date, r.client_name,
              r.created_at, r.updated_at,
-             u.username AS created_by
+             r.amount_received, r.received_by_user_id, r.received_at,
+             u.username AS created_by,
+             ru.username AS received_by
       FROM reports r
-      LEFT JOIN users u ON u.id = r.created_by_user_id
+      LEFT JOIN users u  ON u.id  = r.created_by_user_id
+      LEFT JOIN users ru ON ru.id = r.received_by_user_id
       WHERE r.company_code = ?
     `;
     if (search) {
@@ -2569,7 +2589,7 @@ app.get("/api/stats/billing", auth(["super_user", "admin"]), async (req, res) =>
       : req.user.companyCode;
 
     const rows = await dbAll(
-      "SELECT id, client_name, bank, report_date, state_json FROM reports WHERE company_code=? ORDER BY updated_at DESC",
+      "SELECT r.id, r.client_name, r.bank, r.report_date, r.state_json, r.amount_received AS db_amount_received, r.received_at, r.received_bank, u.username AS received_by FROM reports r LEFT JOIN users u ON u.id = r.received_by_user_id WHERE r.company_code=? ORDER BY r.updated_at DESC",
       [companyCode]
     );
 
@@ -2607,7 +2627,10 @@ app.get("/api/stats/billing", auth(["super_user", "admin"]), async (req, res) =>
       const vatBase    = Math.max(0, total - discount);
       const vatAmt     = s.includeVat ? Math.round(vatBase * 0.13) : 0;
       const grandTotal = vatBase + vatAmt;
-      const received   = parseFloat(s.amountReceived)       || 0;
+      // Prefer dedicated DB column; fall back to state_json for older records
+      const received = row.db_amount_received != null
+        ? (parseFloat(row.db_amount_received) || 0)
+        : (parseFloat(s.amountReceived) || 0);
 
       if (grandTotal > 0 || received > 0) {
         totalBilled   += grandTotal;
@@ -2620,6 +2643,9 @@ app.get("/api/stats/billing", auth(["super_user", "admin"]), async (req, res) =>
           fmv,
           grandTotal,
           received,
+          receivedBy:   row.received_by   || null,
+          receivedAt:   row.received_at   || null,
+          receivedBank: row.received_bank || null,
           outstanding: Math.max(0, grandTotal - received),
         });
       }

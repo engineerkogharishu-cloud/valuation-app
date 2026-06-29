@@ -1663,7 +1663,7 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
                       <tr>
-                        {["#", "Client", "Bank", "Report Date", "FMV (NPR)", "Bill Amount (NPR)", "Received (NPR)", "Outstanding (NPR)"].map(h => (
+                        {["#", "Client", "Bank", "Report Date", "FMV (NPR)", "Bill Amount (NPR)", "Received (NPR)", "Received At", "Received In Bank", "Received By", "Outstanding (NPR)"].map(h => (
                           <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", borderBottom: `1px solid ${C.border}`, background: "#fafbfc", whiteSpace: "nowrap" }}>{h}</th>
                         ))}
                       </tr>
@@ -1678,6 +1678,9 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                           <td style={{ padding: "10px 16px", color: C.text }}>{r.fmv > 0 ? r.fmv.toLocaleString("en-NP") : "—"}</td>
                           <td style={{ padding: "10px 16px", fontWeight: 700, color: C.navy }}>{r.grandTotal > 0 ? r.grandTotal.toLocaleString("en-NP") : "—"}</td>
                           <td style={{ padding: "10px 16px", fontWeight: 700, color: r.received > 0 ? C.success : C.muted }}>{r.received > 0 ? r.received.toLocaleString("en-NP") : "—"}</td>
+                          <td style={{ padding: "10px 16px", color: C.muted, fontSize: 12, whiteSpace: "nowrap" }}>{r.receivedAt || "—"}</td>
+                          <td style={{ padding: "10px 16px", color: C.text, fontSize: 12 }}>{r.receivedBank || "—"}</td>
+                          <td style={{ padding: "10px 16px", color: C.navy, fontSize: 12 }}>{r.receivedBy || "—"}</td>
                           <td style={{ padding: "10px 16px", fontWeight: 700, color: r.outstanding > 0 ? "#e67e22" : C.success }}>
                             {r.outstanding > 0 ? r.outstanding.toLocaleString("en-NP") : <span style={{ color: C.success }}>✓ Paid</span>}
                           </td>
@@ -1689,6 +1692,9 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                         <td colSpan={5} style={{ padding: "10px 16px", fontWeight: 700, color: C.navy }}>TOTAL</td>
                         <td style={{ padding: "10px 16px", fontWeight: 800, color: C.navy }}>{billingStats.totalBilled.toLocaleString("en-NP")}</td>
                         <td style={{ padding: "10px 16px", fontWeight: 800, color: C.success }}>{billingStats.totalReceived.toLocaleString("en-NP")}</td>
+                        <td style={{ padding: "10px 16px" }}></td>
+                        <td style={{ padding: "10px 16px" }}></td>
+                        <td style={{ padding: "10px 16px" }}></td>
                         <td style={{ padding: "10px 16px", fontWeight: 800, color: billingStats.totalOutstanding > 0 ? "#e67e22" : C.success }}>
                           {billingStats.totalOutstanding > 0 ? billingStats.totalOutstanding.toLocaleString("en-NP") : "✓ All Paid"}
                         </td>
@@ -1962,7 +1968,7 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                           <thead>
                             <tr>
-                              {["ID", "Client", "Branch", "Type", "Visit Date", "By", "Rejection Reason"].map(h => (
+                              {["ID", "Client", "Branch", "Type", "Visit Date", "By", "Amt Received", "Received By", "Rejection Reason"].map(h => (
                                 <th key={h} style={{ padding: "9px 12px", textAlign: "left", fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", borderBottom: `2px solid ${C.border}`, background: "#fafbfd", whiteSpace: "nowrap" }}>{h}</th>
                               ))}
                             </tr>
@@ -1988,6 +1994,16 @@ export default function AdminDashboard({ user, onLogout, onOpen }) {
                                 </td>
                                 <td style={{ padding: "8px 12px", color: C.muted, fontSize: 12, whiteSpace: "nowrap" }}>{r.visit_date ? fmtLocal(r.visit_date) : "—"}</td>
                                 <td style={{ padding: "8px 12px", color: C.navy, fontSize: 12, fontWeight: 600 }}>{r.created_by || "—"}</td>
+                                <td style={{ padding: "8px 12px", fontSize: 12, whiteSpace: "nowrap" }}>
+                                  {r.report_type === "final" && r.amount_received != null && r.amount_received > 0
+                                    ? <span style={{ fontWeight: 700, color: "#1a5c3a" }}>NPR {Number(r.amount_received).toLocaleString("en-NP")}</span>
+                                    : <span style={{ color: C.muted }}>—</span>}
+                                </td>
+                                <td style={{ padding: "8px 12px", fontSize: 12 }}>
+                                  {r.report_type === "final" && r.received_by
+                                    ? <span style={{ color: C.navy, fontWeight: 600 }}>{r.received_by}</span>
+                                    : <span style={{ color: C.muted }}>—</span>}
+                                </td>
                                 <td style={{ padding: "8px 12px", fontSize: 11 }}>
                                   {r._isFieldSub && r.rejection_reason
                                     ? <span style={{ color: "#c0392b", fontStyle: "italic" }}>⚠ {r.rejection_reason}</span>

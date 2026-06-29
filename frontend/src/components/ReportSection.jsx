@@ -302,28 +302,108 @@ function FieldChargeDialog({ onConfirm, onCancel, initialReceived, initialAmount
 }
 
 // ── Final Payment Dialog ──────────────────────────────────────────────────────
-function FinalPaymentDialog({ onConfirm, onCancel }) {
-  const [amountReceived, setAmountReceived] = React.useState("");
+// ── Limiting Conditions Verification Dialog ───────────────────────────────────
+function LimitingConditionsVerifyDialog({ conditions, onConfirm, onCancel }) {
+  const [checked, setChecked] = React.useState(false);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,31,61,0.65)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9500 }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: "30px 32px", width: "96%", maxWidth: 520, boxShadow: "0 24px 64px rgba(0,0,0,0.3)" }}>
+        <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 700, color: "#0f1f3d" }}>⚠️ Verify Limiting Conditions</h3>
+        <p style={{ margin: "0 0 18px", fontSize: 13, color: "#7f8c8d" }}>Before generating the Final Report, confirm that all limiting conditions have been fulfilled.</p>
+
+        <div style={{ background: "#fff8e1", border: "1.5px solid #f39c12", borderRadius: 10, padding: "14px 16px", marginBottom: 20, maxHeight: 200, overflowY: "auto" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#7a5c00", marginBottom: 8 }}>Limiting Conditions in Report:</div>
+          <div style={{ fontSize: 13, color: "#5a4000", whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{conditions}</div>
+        </div>
+
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", marginBottom: 24 }}>
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={e => setChecked(e.target.checked)}
+            style={{ width: 18, height: 18, accentColor: "#1a3a6e", marginTop: 2, flexShrink: 0, cursor: "pointer" }}
+          />
+          <span style={{ fontSize: 13, color: "#0f1f3d", fontWeight: 500, lineHeight: 1.5 }}>
+            I confirm that all the above limiting conditions have been verified and fulfilled. The Final Report can be generated.
+          </span>
+        </label>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onCancel}
+            style={{ flex: 1, padding: "11px 0", borderRadius: 9, border: "2px solid #dde1e7", background: "#fafbfd", color: "#555", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            ✗ Cancel — Go Back
+          </button>
+          <button onClick={onConfirm} disabled={!checked}
+            style={{ flex: 1, padding: "11px 0", borderRadius: 9, border: "none", background: checked ? "linear-gradient(135deg,#1a5c3a,#27ae60)" : "#ccc", color: "#fff", fontWeight: 700, fontSize: 13, cursor: checked ? "pointer" : "not-allowed" }}>
+            ✓ Confirmed — Generate Report
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Final Report Payment Dialog ───────────────────────────────────────────────
+function FinalPaymentDialog({ initialAmount, initialReceivedAt, initialReceivedBank, onConfirm, onCancel }) {
+  const [amount, setAmount] = React.useState(initialAmount || "");
+  const todayLocal = new Date().toISOString().slice(0, 10);
+  const [receivedAt, setReceivedAt] = React.useState(initialReceivedAt || todayLocal);
+  const [receivedBank, setReceivedBank] = React.useState(initialReceivedBank || "");
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,31,61,0.65)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9500 }}>
       <div style={{ background: "#fff", borderRadius: 16, padding: "30px 32px", width: "96%", maxWidth: 460, boxShadow: "0 24px 64px rgba(0,0,0,0.3)" }}>
-        <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 700, color: "#1a5c3a" }}>💰 Payment Received</h3>
-        <p style={{ margin: "0 0 22px", fontSize: 13, color: "#7f8c8d" }}>Before generating the Final Report, enter how much has been received from the client.</p>
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#7f8c8d", textTransform: "uppercase", marginBottom: 5 }}>Amount Received (NPR)</label>
+        <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 700, color: "#0f1f3d" }}>💰 Payment Received</h3>
+        <p style={{ margin: "0 0 22px", fontSize: 13, color: "#7f8c8d" }}>Record how much has been received from the client before generating the Final Report.</p>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#7f8c8d", textTransform: "uppercase", marginBottom: 8 }}>
+            Amount Received from Client (NPR)
+          </label>
           <input
-            type="number" value={amountReceived} onChange={e => setAmountReceived(e.target.value)}
-            min="0" placeholder="e.g. 15000" autoFocus
-            style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #dde1e7", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
+            type="number" min="0" placeholder="e.g. 15000"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            autoFocus
+            style={{ width: "100%", padding: "11px 14px", border: "1.5px solid #dde1e7", borderRadius: 9, fontSize: 15, boxSizing: "border-box" }}
           />
-          <div style={{ fontSize: 11, color: "#aaa", marginTop: 5 }}>Leave blank if not applicable.</div>
+          <div style={{ fontSize: 11, color: "#aaa", marginTop: 5 }}>Leave blank or 0 if not yet received.</div>
         </div>
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onCancel} style={{ padding: "9px 20px", border: "1.5px solid #dde1e7", borderRadius: 8, background: "#fff", color: "#555", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-          <button onClick={() => onConfirm(amountReceived)}
-            style={{ padding: "9px 22px", background: "linear-gradient(135deg,#1a5c3a,#27ae60)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-            Generate Final Report →
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#7f8c8d", textTransform: "uppercase", marginBottom: 8 }}>
+            Received At (Date)
+          </label>
+          <input
+            type="date"
+            value={receivedAt}
+            onChange={e => setReceivedAt(e.target.value)}
+            style={{ width: "100%", padding: "11px 14px", border: "1.5px solid #dde1e7", borderRadius: 9, fontSize: 14, boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div style={{ marginBottom: 22 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#7f8c8d", textTransform: "uppercase", marginBottom: 8 }}>
+            Received In Bank
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. Nepal Bank Ltd, Kathmandu Branch"
+            value={receivedBank}
+            onChange={e => setReceivedBank(e.target.value)}
+            style={{ width: "100%", padding: "11px 14px", border: "1.5px solid #dde1e7", borderRadius: 9, fontSize: 14, boxSizing: "border-box" }}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onCancel}
+            style={{ flex: 1, padding: "11px 0", borderRadius: 9, border: "2px solid #dde1e7", background: "#fafbfd", color: "#555", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            ✗ Cancel
+          </button>
+          <button onClick={() => onConfirm(amount, receivedAt, receivedBank)}
+            style={{ flex: 1, padding: "11px 0", borderRadius: 9, border: "none", background: "linear-gradient(135deg,#1a5c3a,#27ae60)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            ✓ Record &amp; Generate Report
           </button>
         </div>
       </div>
@@ -342,6 +422,8 @@ export default function ReportSection({
   billingSystem, setBillingSystem,
   billQrCode, setBillQrCode,
   amountReceived, setAmountReceived,
+  receivedAt, setReceivedAt,
+  onSavePayment,
   finalFMV,
   bank,
   clients, owners, hasBuilding, properties,
@@ -350,6 +432,8 @@ export default function ReportSection({
   const [fullHtml, setFullHtml] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
   const [showFieldDialog, setShowFieldDialog] = React.useState(false);
+  const [showLimitingVerifyDialog, setShowLimitingVerifyDialog] = React.useState(false);
+  const [showFinalPaymentDialog, setShowFinalPaymentDialog] = React.useState(false);
   const [paymentMethods, setPaymentMethods] = React.useState([]);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = React.useState("");
   // feeTiersMap: { [bankName]: tier[] } from company settings
@@ -432,11 +516,11 @@ export default function ReportSection({
     w.document.close();
   }, [fullHtml, showToast]);
 
-  const doGenerate = React.useCallback(async () => {
+  const doGenerate = React.useCallback(async (overrides = {}) => {
     setLoading(true);
     showToast("⏳ Generating report preview…");
     try {
-      const state = { ...collectState(), reportId: reportId || null };
+      const state = { ...collectState(), reportId: reportId || null, ...overrides };
       await fetchLetterhead(state);
 
       state.sitePlans = await expandPdfSitePlans(state.sitePlans || []);
@@ -461,11 +545,16 @@ export default function ReportSection({
     } else if (reportType === "preliminary" && fieldChargeReceived === null) {
       setShowFieldDialog(true);
     } else if (reportType === "final") {
-      doGenerate();
+      const state = collectState();
+      if (state.includeLimitingConditions && state.limitingConditions?.trim()) {
+        setShowLimitingVerifyDialog(true);
+      } else {
+        doGenerate();
+      }
     } else {
       doGenerate();
     }
-  }, [reportType, fieldChargeReceived, doPreviewBill, doGenerate]);
+  }, [reportType, fieldChargeReceived, doPreviewBill, doGenerate, collectState]);
 
   // Auto-regenerate when report type changes (if preview already exists)
   const prevTypeRef = React.useRef(reportType);
@@ -507,6 +596,30 @@ export default function ReportSection({
       {ConfirmDialog}
 
       {/* ── Field Charge Dialog ── */}
+      {showLimitingVerifyDialog && (
+        <LimitingConditionsVerifyDialog
+          conditions={collectState().limitingConditions}
+          onConfirm={() => { setShowLimitingVerifyDialog(false); setShowFinalPaymentDialog(true); }}
+          onCancel={() => setShowLimitingVerifyDialog(false)}
+        />
+      )}
+
+      {showFinalPaymentDialog && (
+        <FinalPaymentDialog
+          initialAmount={amountReceived}
+          initialReceivedAt={receivedAt}
+          initialReceivedBank={collectState().receivedBank || ""}
+          onConfirm={(amount, date, bank) => {
+            setAmountReceived(amount);
+            if (setReceivedAt) setReceivedAt(date);
+            setShowFinalPaymentDialog(false);
+            if (onSavePayment) onSavePayment(amount, date, bank);
+            doGenerate({ amountReceived: amount, receivedAt: date, receivedBank: bank });
+          }}
+          onCancel={() => setShowFinalPaymentDialog(false)}
+        />
+      )}
+
       {showFieldDialog && (
         <FieldChargeDialog
           initialReceived={fieldChargeReceived}

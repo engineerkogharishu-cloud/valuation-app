@@ -228,6 +228,8 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
   const [billingSystem, setBillingSystem]             = useState("nva"); // "nva" = Nepal Valuators Assoc, "bank" = bank-specific tiers
   const [billQrCode, setBillQrCode]                   = useState("");    // payment QR code data URL
   const [amountReceived, setAmountReceived]           = useState("");    // advance / amount received from client
+  const [receivedAt, setReceivedAt]                   = useState("");
+  const [receivedBank, setReceivedBank]               = useState("");
   // Final report extra fields
   // Letterhead — fetched from server (set by company admin/super_user via company profile)
   const [letterheadHtml, setLetterheadHtml] = useState("");
@@ -516,7 +518,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
     propDescriptions, photos, sitePlans, legalDocs, valuatorInfo,
     buildingDetails,
     fieldChargeReceived, fieldChargeAmount, transportationCharge,
-    billNo, includeVat, billRemarks, extraChargeLabel, extraChargeAmount, discountAmount, deductFieldVisit, billingSystem, billQrCode, amountReceived,
+    billNo, includeVat, billRemarks, extraChargeLabel, extraChargeAmount, discountAmount, deductFieldVisit, billingSystem, billQrCode, amountReceived, receivedAt, receivedBank,
     finalFMV: finalFMVRef.current,
     // letterheadHtml and letterheadTextBox are intentionally excluded here.
     // They are stored in the company profile (DB) and always fetched fresh
@@ -524,7 +526,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
     // in every report snapshot and prevent the super admin's changes from
     // taking effect on existing reports.
     customBanks,
-  }), [bank, branch, visitDate, reportDate, reportType, clients, owners, isBuySell, properties, buildings, hasBuilding, mortgagedIds, areaMeasured, deductions, rates, plotRateSplits, access, roadAccess, buildingVals, extraBoundaryRows, commercialPct, distressPct, govValues, remarks, limitingConditions, includeLimitingConditions, propDescriptions, photos, sitePlans, legalDocs, valuatorInfo, buildingDetails, customBanks, fieldChargeReceived, fieldChargeAmount, transportationCharge, billNo, includeVat, billRemarks, extraChargeLabel, extraChargeAmount, discountAmount, deductFieldVisit, billingSystem, billQrCode, amountReceived]);
+  }), [bank, branch, visitDate, reportDate, reportType, clients, owners, isBuySell, properties, buildings, hasBuilding, mortgagedIds, areaMeasured, deductions, rates, plotRateSplits, access, roadAccess, buildingVals, extraBoundaryRows, commercialPct, distressPct, govValues, remarks, limitingConditions, includeLimitingConditions, propDescriptions, photos, sitePlans, legalDocs, valuatorInfo, buildingDetails, customBanks, fieldChargeReceived, fieldChargeAmount, transportationCharge, billNo, includeVat, billRemarks, extraChargeLabel, extraChargeAmount, discountAmount, deductFieldVisit, billingSystem, billQrCode, amountReceived, receivedAt, receivedBank]);
 
   const handleSaveToDb = React.useCallback(async () => {
     setDbSaving(true);
@@ -711,6 +713,8 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
       if (d.billingSystem !== undefined) setBillingSystem(d.billingSystem || "nva");
       if (d.billQrCode !== undefined) setBillQrCode(d.billQrCode || "");
       if (d.amountReceived !== undefined) setAmountReceived(d.amountReceived || "");
+      if (d.receivedAt !== undefined) setReceivedAt(d.receivedAt || "");
+      if (d.receivedBank !== undefined) setReceivedBank(d.receivedBank || "");
       if(d.letterheadHtml !== undefined) { /* letterhead now comes from server, not saved state */ }
       if(d.customBanks) saveCustomBanks(d.customBanks);
       setActiveSection(1);
@@ -3665,6 +3669,16 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
           setBillQrCode={setBillQrCode}
           amountReceived={amountReceived}
           setAmountReceived={setAmountReceived}
+          receivedAt={receivedAt}
+          setReceivedAt={setReceivedAt}
+          onSavePayment={async (amount, date, bank) => {
+            const state = { ...collectState(), amountReceived: amount, receivedAt: date, receivedBank: bank };
+            const filename = getFileName("json");
+            try {
+              if (reportId) { await api.updateReport(reportId, state, filename); }
+              else { const res = await api.saveReport(state, filename); setReportId(res.id); if (onSavedToDb) onSavedToDb(res.id); }
+            } catch (_) {}
+          }}
           finalFMV={finalFMValue}
           bank={bank}
           clients={clients}
