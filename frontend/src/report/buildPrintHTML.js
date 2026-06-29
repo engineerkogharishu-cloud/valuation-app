@@ -255,7 +255,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
   const roadAccessHTML=(s.properties||[]).map(p=>{
     const rows=(s.roadAccess?.[p.id]||[]);
     if(!rows.length) return `<tr><td>${esc(p.plotNo)}</td><td colspan="5" style="font-style:italic;color:#999">No access rows entered</td></tr>`;
-    return rows.map(r=>`<tr><td>${esc(p.plotNo)}</td><td>${esc(r.roadType)}</td><td>${esc(r.frontage)}</td><td>${esc(r.widthField)}</td><td>${esc(r.widthTrace)}</td><td>${esc(r.remarks)}</td></tr>`).join("");
+    return rows.map(r=>`<tr><td>${esc(p.plotNo)}</td><td>${esc(r.roadType)}</td><td>${esc(r.frontage)}</td><td>${esc(r.widthField)}</td><td>${esc(r.widthTrace)}</td><td>${esc(r.rightOfWay)}</td><td>${esc(r.remarks)}</td></tr>`).join("");
   }).join("");
 
   const boundaryRows = [
@@ -1281,8 +1281,8 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
 
     <div class="sec-h3" id="toc-s5">2.3 &nbsp; Access to Property</div>
     <table>
-      <thead><tr><th>Plot No.</th><th>Type of Road</th><th>Frontage (ft)</th><th>Width (Field) ft</th><th>Width (Trace) ft</th><th>Remarks</th></tr></thead>
-      <tbody>${roadAccessHTML||`<tr><td colspan="6" style="text-align:center;font-style:italic;color:#888">No road access data</td></tr>`}</tbody>
+      <thead><tr><th>Plot No.</th><th>Type of Road</th><th>Frontage (ft)</th><th>Width (Field) ft</th><th>Width (Trace) ft</th><th>Right of Way (ft)</th><th>Remarks</th></tr></thead>
+      <tbody>${roadAccessHTML||`<tr><td colspan="7" style="text-align:center;font-style:italic;color:#888">No road access data</td></tr>`}</tbody>
     </table>
 
     <div class="sec-h3">2.4 &nbsp; Boundary Declaration</div>

@@ -1965,7 +1965,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
             const rows = roadAccess[prop.id] || [];
             const addRow = () => setRoadAccess(ra => ({
               ...ra,
-              [prop.id]: [...(ra[prop.id]||[]), { id: uid(), roadType:"", frontage:"", widthField:"", widthTrace:"", remarks:"" }]
+              [prop.id]: [...(ra[prop.id]||[]), { id: uid(), roadType:"", frontage:"", widthField:"", widthTrace:"", rightOfWay:"", remarks:"" }]
             }));
             const removeRow = (rid) => setRoadAccess(ra => ({
               ...ra, [prop.id]: (ra[prop.id]||[]).filter(r=>r.id!==rid)
@@ -1987,13 +1987,14 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                         <th>Frontage of Plot (ft)</th>
                         <th>Width as per Field (ft)</th>
                         <th>Width as per Trace (ft)</th>
+                        <th>Right of Way (ft)</th>
                         <th>Remarks</th>
                         <th style={{width:"36px"}}></th>
                       </tr>
                     </thead>
                     <tbody>
                       {rows.length === 0 && (
-                        <tr><td colSpan={6} className="empty-row">No access rows — click "+ Add Access Row" above</td></tr>
+                        <tr><td colSpan={7} className="empty-row">No access rows — click "+ Add Access Row" above</td></tr>
                       )}
                       {rows.map(row => (
                         <tr key={row.id}>
@@ -2001,7 +2002,8 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                           <td><input type="text" value={row.frontage} onChange={e=>updateRow(row.id,"frontage",e.target.value)} placeholder={`e.g. 10'6"`} style={{width:"80px"}}/></td>
                           <td><input type="text" value={row.widthField} onChange={e=>updateRow(row.id,"widthField",e.target.value)} placeholder={`e.g. 12'`} style={{width:"80px"}}/></td>
                           <td><input type="text" value={row.widthTrace} onChange={e=>updateRow(row.id,"widthTrace",e.target.value)} placeholder={`e.g. 12'`} style={{width:"80px"}}/></td>
-                          <td><input value={row.remarks} onChange={e=>updateRow(row.id,"remarks",e.target.value)} placeholder="Additional notes"/></td>
+                          <td><input type="text" value={row.rightOfWay||""} onChange={e=>updateRow(row.id,"rightOfWay",e.target.value)} placeholder={`e.g. 20'`} style={{width:"80px"}}/></td>
+                          <td><input value={row.remarks||""} onChange={e=>updateRow(row.id,"remarks",e.target.value)} placeholder="Additional notes"/></td>
                           <td><button className="btn-remove" onClick={()=>removeRow(row.id)}>✕</button></td>
                         </tr>
                       ))}

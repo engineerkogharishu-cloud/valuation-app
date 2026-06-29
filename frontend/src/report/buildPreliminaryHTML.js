@@ -152,10 +152,10 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
   // ── 7. Road Access
   const roadAccessHTML = (s.properties || []).map(p => {
     const rows = s.roadAccess?.[p.id] || [];
-    if (!rows.length) return `<tr><td>${esc(p.plotNo)}</td><td colspan="5" class="empty-cell">No access rows entered</td></tr>`;
+    if (!rows.length) return `<tr><td>${esc(p.plotNo)}</td><td colspan="6" class="empty-cell">No access rows entered</td></tr>`;
     return rows.map(r => `<tr>
       <td>${esc(p.plotNo)}</td><td>${esc(r.roadType)}</td><td>${esc(r.frontage)}</td>
-      <td>${esc(r.widthField)}</td><td>${esc(r.widthTrace)}</td><td>${esc(r.remarks)}</td>
+      <td>${esc(r.widthField)}</td><td>${esc(r.widthTrace)}</td><td>${esc(r.rightOfWay)}</td><td>${esc(r.remarks)}</td>
     </tr>`).join("");
   }).join("");
 
@@ -877,8 +877,8 @@ ${(() => {
 
 <h3 class="sec-h3"><span class="sec-num">6</span>Access to Property</h3>
 <table>
-  <thead><tr><th>Plot No.</th><th>Type of Road</th><th>Frontage of Plot</th><th>Width (Field)</th><th>Width (Trace)</th><th>Remarks</th></tr></thead>
-  <tbody>${roadAccessHTML || `<tr><td colspan="6" class="empty-cell">No road access data</td></tr>`}</tbody>
+  <thead><tr><th>Plot No.</th><th>Type of Road</th><th>Frontage of Plot</th><th>Width (Field)</th><th>Width (Trace)</th><th>Right of Way</th><th>Remarks</th></tr></thead>
+  <tbody>${roadAccessHTML || `<tr><td colspan="7" class="empty-cell">No road access data</td></tr>`}</tbody>
 </table>
 
 <h3 class="sec-h3"><span class="sec-num">7</span>Boundary Declaration</h3>
