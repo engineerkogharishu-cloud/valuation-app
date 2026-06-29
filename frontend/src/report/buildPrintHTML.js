@@ -1085,7 +1085,14 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
         const ow0=s.owners||[];
         const multiP=pr0.length>1;
         const multiO=ow0.length>1;
-        const aFmt=p=>{if(!p)return'—';if(p.areaUnit==='radp'){const r=p.areaRadp||{};return[r.r&&r.r+'-R',r.a&&r.a+'-A',r.p&&r.p+'-P',r.d&&r.d+'-D'].filter(Boolean).join(' ')||'—';}return p.areaSqm?p.areaSqm+' sq.m':'—';};
+        const aFmt=p=>{
+          if(!p)return'—';
+          const sqm=propAreaSqm(p);
+          const sqmStr=sqm>0?sqm.toFixed(2)+' sq.m':'—';
+          if(p.areaUnit==='bkd'){const b=p.areaBkd||{};const nat=[b.b&&b.b+' Bigha',b.k&&b.k+' Kattha',b.d&&b.d+' Dhur'].filter(Boolean).join(' ')||'—';return sqm>0?`${sqmStr} (${nat})`:`${nat}`;}
+          if(p.areaUnit==='radp'){const r=p.areaRadp||{};const nat=[r.r&&r.r+'-R',r.a&&r.a+'-A',r.p&&r.p+'-P',r.d&&r.d+'-D'].filter(Boolean).join(' ')||'—';return sqm>0?`${sqmStr} (${nat})`:`${nat}`;}
+          return sqmStr;
+        };
         const distM=(a,b,c,d)=>{const R=6371000,rad=Math.PI/180,dL=(c-a)*rad,dN=(d-b)*rad,x=Math.sin(dL/2)**2+Math.cos(a*rad)*Math.cos(c*rad)*Math.sin(dN/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));};
         const dedupAddr=(key)=>{const groups=[];pr0.forEach(p=>{const addr=(p[key]||'').trim();if(!addr)return;const lat=parseFloat(p.lat),lng=parseFloat(p.lng),hasGPS=!isNaN(lat)&&!isNaN(lng);let merged=false;for(const g of groups){const gl=parseFloat(g.lat),gn=parseFloat(g.lng),gh=!isNaN(gl)&&!isNaN(gn);if(g.addr===addr||(hasGPS&&gh&&distM(lat,lng,gl,gn)<=30)){g.plots.push(p.plotNo||'—');merged=true;break;}}if(!merged)groups.push({addr,plots:[p.plotNo||'—'],lat:p.lat,lng:p.lng});});return groups;};
         if(!multiP && !multiO){
