@@ -910,7 +910,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
   const _propUnitLabel  = (pid) => rateUnitLabel(properties.find(p=>p.id===pid));
   const _propUnitDisplay = (pid, sqm) => {
     const prop = properties.find(p=>p.id===pid);
-    if (prop && prop.areaUnit === "bkd") return sqmToDhur(sqm).toFixed(3) + " Dhur";
+    if (prop && _isBkdRateProp(prop)) return sqmToDhur(sqm).toFixed(3) + " Dhur";
     return sqmToAana(sqm).toFixed(4) + " Anna";
   };
 
@@ -2662,7 +2662,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                         <tbody>
                           {splits.map((sp,si) => {
                             const spArea = parseFloat(sp.areaSqm)||0;
-                            const spUnitAmt = p.areaUnit === "bkd" ? sqmToDhur(spArea) : sqmToAana(spArea);
+                            const spUnitAmt = _isBkdRateProp(p) ? sqmToDhur(spArea) : sqmToAana(spArea);
                             const spCommRate = parseFloat(sp.commercialRate)||0;
                             const spCW = sp.commercialWeight !== undefined ? parseFloat(sp.commercialWeight) : 70;
                             const spGW = sp.govWeight !== undefined ? parseFloat(sp.govWeight) : 30;
@@ -2674,7 +2674,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                               <tr key={sp.id} style={{height:"50px"}}>
                                 <td><input value={sp.label} onChange={e=>updateSplit(sp.id,"label",e.target.value)} placeholder={`Zone ${si+1}`} style={{width:"110px",fontSize:"14px",padding:"8px 10px"}}/></td>
                                 <td><input type="number" min="0" value={sp.areaSqm} onChange={e=>updateSplit(sp.id,"areaSqm",e.target.value)} placeholder="0" style={{width:"100px",fontSize:"14px",padding:"8px 10px"}}/></td>
-                                <td className="calc-cell" style={{fontSize:"14px",fontWeight:600}}>{p.areaUnit==="bkd"?spUnitAmt.toFixed(3):spUnitAmt.toFixed(4)}</td>
+                                <td className="calc-cell" style={{fontSize:"14px",fontWeight:600}}>{_isBkdRateProp(p)?spUnitAmt.toFixed(3):spUnitAmt.toFixed(4)}</td>
                                 <td><input type="number" min="0" value={sp.commercialRate} onChange={e=>updateSplit(sp.id,"commercialRate",e.target.value)} placeholder="0" style={{width:"110px",fontSize:"14px",padding:"8px 10px"}}/></td>
                                 <td><input type="number" min="0" value={sp.govRate} onChange={e=>updateSplit(sp.id,"govRate",e.target.value)} placeholder="0" style={{width:"100px",fontSize:"14px",padding:"8px 10px"}}/></td>
                                 <td>
@@ -2699,7 +2699,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                           <tr className="total-row">
                             <td><strong>Total</strong></td>
                             <td className="calc-cell"><strong>{splitTotal.toFixed(2)}</strong></td>
-                            <td className="calc-cell"><strong>{p.areaUnit==="bkd"?sqmToDhur(splitTotal).toFixed(3):sqmToAana(splitTotal).toFixed(4)}</strong></td>
+                            <td className="calc-cell"><strong>{_isBkdRateProp(p)?sqmToDhur(splitTotal).toFixed(3):sqmToAana(splitTotal).toFixed(4)}</strong></td>
                             <td colSpan={5}></td>
                             <td className="highlight"><strong>NPR {getCommercialLandValue(p.id).toLocaleString("en-NP",{maximumFractionDigits:0})}</strong></td>
                             <td className="highlight"><strong>NPR {getFMVLandValue(p.id).toLocaleString("en-NP",{maximumFractionDigits:0})}</strong></td>
