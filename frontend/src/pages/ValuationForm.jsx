@@ -130,6 +130,8 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
     if (s.photos)       setPhotos(s.photos);
     if (s.sitePlans)    setSitePlans(s.sitePlans);
     if (s.legalDocs)    setLegalDocs(s.legalDocs);
+    if (s.docChecks)    setDocChecks(s.docChecks);
+    if (s.customDocLabels) setCustomDocLabels(s.customDocLabels);
     if (s.valuatorInfo) setValuatorInfo(s.valuatorInfo);
     if (s.buildingDetails) setBuildingDetails(s.buildingDetails);
     // letterhead now comes from server (company profile), not from saved state
