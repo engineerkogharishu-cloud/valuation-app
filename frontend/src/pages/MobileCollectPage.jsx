@@ -218,6 +218,23 @@ export default function MobileCollectPage({ token, shortCode }) {
   const toggleHazard  = (k)    => setHazards(h => ({ ...h, [k]: !h[k] }));
   const setHazardNote = (k, v) => setHazards(h => ({ ...h, [k]: v }));
 
+  // ── Missing Documents ─────────────────────────────────────
+  const [docChecks,   setDocChecks]   = useState({});   // { label: true/false }
+  const [customDocs,  setCustomDocs]  = useState([]);   // extra doc labels
+  const [newDocText,  setNewDocText]  = useState("");
+
+  const toggleDoc  = (label) => setDocChecks(prev => ({ ...prev, [label]: !prev[label] }));
+  const addCustomDoc = () => {
+    const t = newDocText.trim();
+    if (!t || customDocs.includes(t)) return;
+    setCustomDocs(prev => [...prev, t]);
+    setNewDocText("");
+  };
+  const removeCustomDoc = (label) => {
+    setCustomDocs(prev => prev.filter(l => l !== label));
+    setDocChecks(prev => { const n = { ...prev }; delete n[label]; return n; });
+  };
+
   // ── Photos ────────────────────────────────────────────────
   const [photos,      setPhotos]      = useState([]);
   const [compressing, setCompressing] = useState(false);
@@ -256,19 +273,31 @@ export default function MobileCollectPage({ token, shortCode }) {
   };
 
   // ── Build payload ─────────────────────────────────────────
-  const buildPayload = () => ({
-    ...(shortCode ? { short_code: shortCode } : { token }),
-    data: {
-      ...form,
-      plotNos: plotNos.map(p => p.no.trim()).filter(Boolean),
-      traceSheets: Object.fromEntries(plotNos.filter(p => p.no.trim()).map(p => [p.no.trim(), p.traceSheet])),
-      area,
-      roads: roads.filter(r => r.type || r.width || r.side),
-      building: hasBuilding === "yes" ? { ...building, present: true, specs } : { present: false, status: hasBuilding },
-      hazards,
-    },
-    photos,
-  });
+  const buildPayload = () => {
+    const allDocLabels = [
+      "Land Ownership Certificate (Lalpurja)", "Trace", "Tiro", "Charkilla",
+      "Field Book or Shresta", "Road Verification Letter", "Land Registration Paper",
+      ...(hasBuilding === "yes" ? ["Building Ijajat (Asthai / Sthai)", "Building Nirman Sampanna", "Building Naksa"] : []),
+      ...customDocs,
+    ];
+    const missingDocs = allDocLabels.filter(l => !docChecks[l]);
+    const availableDocs = allDocLabels.filter(l => !!docChecks[l]);
+    return {
+      ...(shortCode ? { short_code: shortCode } : { token }),
+      data: {
+        ...form,
+        plotNos: plotNos.map(p => p.no.trim()).filter(Boolean),
+        traceSheets: Object.fromEntries(plotNos.filter(p => p.no.trim()).map(p => [p.no.trim(), p.traceSheet])),
+        area,
+        roads: roads.filter(r => r.type || r.width || r.side),
+        building: hasBuilding === "yes" ? { ...building, present: true, specs } : { present: false, status: hasBuilding },
+        hazards,
+        missingDocs,
+        availableDocs,
+      },
+      photos,
+    };
+  };
 
   // ── Submit ────────────────────────────────────────────────
   const [submitting,  setSubmitting]  = useState(false);
@@ -301,7 +330,7 @@ export default function MobileCollectPage({ token, shortCode }) {
     setArea({ r: "", a: "", p: "", d: "" });
     setRoads([{ ...EMPTY_ROAD }]);
     setHasBuilding(null); setBuilding({ numFloors: "", structureType: "", foundationType: "", faceDirection: "", totalAreaSqft: "", remarks: "" }); setSpecs({ ...RCC_DEFAULTS });
-    setHazards(EMPTY_HAZARDS); setPhotos([]); setSubmitted(false); setSubmitError("");
+    setHazards(EMPTY_HAZARDS); setPhotos([]); setDocChecks({}); setCustomDocs([]); setNewDocText(""); setSubmitted(false); setSubmitError("");
   };
 
   // ── Render ────────────────────────────────────────────────
@@ -676,7 +705,84 @@ export default function MobileCollectPage({ token, shortCode }) {
           </FL>
         </Section>
 
-        {/* ── 11. PHOTOS ── */}
+        {/* ── 11. MISSING DOCUMENTS ── */}
+        <Section icon="📋" title="Missing Documents Checklist">
+          <p style={{ margin: "0 0 12px", fontSize: 13, color: "#555" }}>
+            Check each document that is <strong>available</strong>. Unchecked items will be flagged as missing.
+          </p>
+
+          {/* Standard land docs */}
+          {[
+            "Land Ownership Certificate (Lalpurja)",
+            "Trace",
+            "Tiro",
+            "Charkilla",
+            "Field Book or Shresta",
+            "Road Verification Letter",
+            "Land Registration Paper",
+          ].map(label => (
+            <DocCheckRow key={label} label={label} checked={!!docChecks[label]} onToggle={() => toggleDoc(label)} />
+          ))}
+
+          {/* Building docs — only if building present */}
+          {hasBuilding === "yes" && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#be185d", textTransform: "uppercase", margin: "12px 0 6px", letterSpacing: 0.4 }}>Building</div>
+              {["Building Ijajat (Asthai / Sthai)", "Building Nirman Sampanna", "Building Naksa"].map(label => (
+                <DocCheckRow key={label} label={label} checked={!!docChecks[label]} onToggle={() => toggleDoc(label)} />
+              ))}
+            </>
+          )}
+
+          {/* Custom docs */}
+          {customDocs.length > 0 && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", margin: "12px 0 6px", letterSpacing: 0.4 }}>Additional</div>
+              {customDocs.map(label => (
+                <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <DocCheckRow label={label} checked={!!docChecks[label]} onToggle={() => toggleDoc(label)} />
+                  </div>
+                  <button type="button" onClick={() => removeCustomDoc(label)} style={S.btnX}>✕</button>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* Add custom doc */}
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <input
+              style={{ ...S.input, flex: 1 }}
+              value={newDocText}
+              onChange={e => setNewDocText(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addCustomDoc())}
+              placeholder="Add custom document…"
+            />
+            <button type="button" onClick={addCustomDoc} style={{ ...S.btnAdd, whiteSpace: "nowrap" }}>＋ Add</button>
+          </div>
+
+          {/* Missing summary */}
+          {(() => {
+            const allLabels = [
+              "Land Ownership Certificate (Lalpurja)", "Trace", "Tiro", "Charkilla",
+              "Field Book or Shresta", "Road Verification Letter", "Land Registration Paper",
+              ...(hasBuilding === "yes" ? ["Building Ijajat (Asthai / Sthai)", "Building Nirman Sampanna", "Building Naksa"] : []),
+              ...customDocs,
+            ];
+            const missing = allLabels.filter(l => !docChecks[l]);
+            if (missing.length === 0) return <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "#e8f5e9", border: "1.5px solid #27ae60", color: "#1a5c3a", fontWeight: 700, fontSize: 13 }}>✅ All documents available</div>;
+            return (
+              <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "#fff8e1", border: "1.5px solid #f39c12" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#7a5c00", marginBottom: 5 }}>📋 {missing.length} document{missing.length > 1 ? "s" : ""} to request from client:</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {missing.map(l => <li key={l} style={{ fontSize: 12, color: "#7a5c00", marginBottom: 2 }}>{l}</li>)}
+                </ul>
+              </div>
+            );
+          })()}
+        </Section>
+
+        {/* ── 12. PHOTOS ── */}
         <Section icon="📷" title={`Photos (${photos.length}/20)`}>
           <button type="button" style={S.btnPhoto} onClick={() => fileRef.current?.click()} disabled={compressing}>
             {compressing ? "⏳ Compressing…" : "📷 Add Photos"}
@@ -741,6 +847,21 @@ function EditableSelect({ value, onChange, options, style }) {
       <datalist id={id}>{options.map(o => <option key={o} value={o} />)}</datalist>
       <input style={style.input} list={id} value={value} onChange={onChange} />
     </>
+  );
+}
+
+function DocCheckRow({ label, checked, onToggle }) {
+  return (
+    <button type="button" onClick={onToggle}
+      style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", border: `1.5px solid ${checked ? "#27ae60" : "#ddd"}`, borderRadius: 8, padding: "10px 12px", background: checked ? "#e8f5e9" : "#fff", cursor: "pointer", marginBottom: 7, textAlign: "left" }}>
+      <span style={{ width: 20, height: 20, borderRadius: 4, border: `1.5px solid ${checked ? "#27ae60" : "#ccc"}`, background: checked ? "#27ae60" : "#f5f5f5", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#fff", fontWeight: 700, flexShrink: 0 }}>
+        {checked ? "✓" : ""}
+      </span>
+      <span style={{ fontSize: 14, fontWeight: checked ? 600 : 400, color: checked ? "#1a5c3a" : "#444", flex: 1 }}>{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: checked ? "#27ae60" : "#f39c12", color: "#fff", whiteSpace: "nowrap", flexShrink: 0 }}>
+        {checked ? "✓ Available" : "⚠ Missing"}
+      </span>
+    </button>
   );
 }
 
