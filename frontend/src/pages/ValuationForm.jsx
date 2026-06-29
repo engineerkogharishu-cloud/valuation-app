@@ -950,6 +950,10 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
   const totalFMVLand = properties.filter(p=>mortgagedIds.has(p.id)).reduce((s,p)=>s+getFMVLandValueRounded(p.id),0);
 
   const mortgaged = properties.filter(p => mortgagedIds.has(p.id));
+  const valAllBkd = mortgaged.length > 0 && mortgaged.every(p => p.areaUnit === "bkd");
+  const valAnyBkd = mortgaged.some(p => p.areaUnit === "bkd");
+  const valUnitHdr   = valAllBkd ? "Dhur" : valAnyBkd ? "Aana / Dhur" : "Aana";
+  const valNativeHdr = valAllBkd ? "B-K-D" : valAnyBkd ? "Native" : "R-A-P-D";
 
   const sumBuildingAreas = (b, key) =>
     (b.areaTable||[]).reduce((s,a)=>s+(parseFloat(a[key])||0),0);
@@ -2742,18 +2746,18 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
       render: () => (
         <div>
           <SectionHeader num="8" title="Valuation of Land" />
-          <p style={{fontWeight:"bold",fontSize:"13px",margin:"6px 0 2px"}}>8A. Land Rates per Anna</p>
+          <p style={{fontWeight:"bold",fontSize:"13px",margin:"6px 0 2px"}}>8A. Land Rates per {valUnitHdr}</p>
           <div className="table-wrapper">
             <table>
               <thead>
                 <tr>
                   <th>Plot No. / Zone</th>
                   <th>Area (sq.m)</th>
-                  <th>R-A-P-D</th>
-                  <th>Anna</th>
-                  <th>Govt. Rate (NPR/Anna)</th>
-                  <th>Commercial Rate (NPR/Anna)</th>
-                  <th>FMV Rate (NPR/Anna)</th>
+                  <th>{valNativeHdr}</th>
+                  <th>{valUnitHdr}</th>
+                  <th>Govt. Rate (NPR/{valUnitHdr})</th>
+                  <th>Commercial Rate (NPR/{valUnitHdr})</th>
+                  <th>FMV Rate (NPR/{valUnitHdr})</th>
                 </tr>
               </thead>
               <tbody>
@@ -2763,6 +2767,13 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                   const {r,a,p:pp,d} = sqmToRadp(ca);
                   const splits = plotRateSplits[p.id]||[];
                   const hasSplits = splits.length > 0;
+
+                  const isBkdP = p.areaUnit === "bkd";
+                  const pNativeStr = (sqm) => {
+                    if (isBkdP) { const x=sqmToBkd(sqm); return `${x.b}-${Math.floor(x.k)}-${x.d.toFixed(2)}`; }
+                    const {r:rr,a:aa,p:pp2,d:dd}=sqmToRadp(sqm); return `${rr}-${aa}-${pp2}-${dd}`;
+                  };
+                  const pUnitStr = (sqm) => isBkdP ? sqmToDhur(sqm).toFixed(3) : sqmToAana(sqm).toFixed(4);
 
                   if (hasSplits) {
                     return (
@@ -2774,15 +2785,14 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                           const spCRate = parseFloat(sp.commercialRate)||0;
                           const spFmvRate = getSplitFMVRate({...sp, commercialWeight:spCW, govWeight:spGW});
                           const spZoneGovRate = parseFloat(sp.govRate)||0;
-                          const {r:sr,a:sa,p:sp2,d:sd} = sqmToRadp(spArea);
                           return (
                             <tr key={sp.id} style={{background:"#fffaf5"}}>
                               <td style={{paddingLeft:"20px",fontStyle:"italic",color:"#555"}}>
                                 {p.plotNo||"—"} — {sp.label||`Zone ${si+1}`}
                               </td>
                               <td className="calc-cell">{spArea.toFixed(2)}</td>
-                              <td className="calc-cell">{sr}-{sa}-{sp2}-{sd}</td>
-                              <td className="calc-cell">{sqmToAana(spArea).toFixed(4)}</td>
+                              <td className="calc-cell">{pNativeStr(spArea)}</td>
+                              <td className="calc-cell">{pUnitStr(spArea)}</td>
                               <td className="calc-cell" style={{color:"#1565c0",fontWeight:700}}>
                                 {spZoneGovRate ? spZoneGovRate.toLocaleString("en-NP",{minimumFractionDigits:2,maximumFractionDigits:2}) : <span style={{color:"var(--text-3)",fontStyle:"italic",fontWeight:400}}>—</span>}
                               </td>
@@ -2792,13 +2802,12 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                           );
                         })}
                         {(()=>{
-                          const gRate = parseFloat(splits[0]?.govRate)||0;
                           return (
                           <tr style={{background:"#f0ece6",fontWeight:600}}>
                             <td>{p.plotNo||"—"} — Sub-total</td>
                             <td className="calc-cell">{ca.toFixed(2)}</td>
-                            <td className="calc-cell">{r}-{a}-{pp}-{d}</td>
-                            <td className="calc-cell">{sqmToAana(ca).toFixed(4)}</td>
+                            <td className="calc-cell">{pNativeStr(ca)}</td>
+                            <td className="calc-cell">{pUnitStr(ca)}</td>
                             <td className="calc-cell" style={{color:"var(--text-3)",fontStyle:"italic",fontWeight:400}}>—</td>
                             <td colSpan={2} style={{textAlign:"center",fontStyle:"italic",color:"var(--text-3)",fontSize:"11px"}}>Multiple rates</td>
                           </tr>
@@ -2816,8 +2825,8 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                     <tr key={p.id}>
                       <td>{p.plotNo||"—"}</td>
                       <td className="calc-cell">{ca.toFixed(2)}</td>
-                      <td className="calc-cell">{r}-{a}-{pp}-{d}</td>
-                      <td className="calc-cell">{sqmToAana(ca).toFixed(4)}</td>
+                      <td className="calc-cell">{pNativeStr(ca)}</td>
+                      <td className="calc-cell">{pUnitStr(ca)}</td>
                       <td className="calc-cell" style={{color:"#1565c0",fontWeight:700}}>
                         {gRate ? gRate.toLocaleString("en-NP",{minimumFractionDigits:2,maximumFractionDigits:2}) : <span style={{color:"var(--text-3)",fontStyle:"italic",fontWeight:400}}>enter in Sec. 6</span>}
                       </td>
@@ -2836,7 +2845,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
               <thead>
                 <tr>
                   <th>Plot No. / Zone</th>
-                  <th>Anna</th>
+                  <th>{valUnitHdr}</th>
                   <th>Govt. Value (NPR)</th>
                   <th>Commercial Value (NPR)</th>
                   <th>FMV Value (NPR)</th>
@@ -2855,6 +2864,11 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                   const fvR = Math.floor(fv / 100) * 100;
                   const dvR = Math.floor(fvR * distressMultiplier / 100) * 100;
 
+                  const isBkdP2 = p.areaUnit === "bkd";
+                  const pUf2 = _propUnitFactor(p.id);
+                  const pUnitStr2 = (sqm) => isBkdP2 ? sqmToDhur(sqm).toFixed(3) : sqmToAana(sqm).toFixed(4);
+                  const pUnitAmt2 = (sqm) => sqm / pUf2;
+
                   if (hasSplits) {
                     return (
                       <React.Fragment key={p.id}>
@@ -2864,17 +2878,17 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                           const spGW = sp.govWeight !== undefined ? parseFloat(sp.govWeight) : 30;
                           const spCRate = parseFloat(sp.commercialRate)||0;
                           const spFmvRate = getSplitFMVRate({...sp, commercialWeight:spCW, govWeight:spGW});
-                          const spCVal = spArea * spCRate / AANA_TO_SQM;
-                          const spFVal = spArea * spFmvRate / AANA_TO_SQM;
+                          const spCVal = spArea * spCRate / pUf2;
+                          const spFVal = spArea * spFmvRate / pUf2;
                           const spDVal = Math.floor(spFVal * distressMultiplier / 100) * 100;
                           const spZoneGovRate2 = parseFloat(sp.govRate)||0;
-                          const spGovVal2 = spZoneGovRate2 * sqmToAana(spArea);
+                          const spGovVal2 = spZoneGovRate2 * pUnitAmt2(spArea);
                           return (
                             <tr key={sp.id} style={{background:"#fffaf5"}}>
                               <td style={{paddingLeft:"20px",fontStyle:"italic",color:"#555"}}>
                                 {p.plotNo||"—"} — {sp.label||`Zone ${si+1}`}
                               </td>
-                              <td className="calc-cell">{sqmToAana(spArea).toFixed(4)}</td>
+                              <td className="calc-cell">{pUnitStr2(spArea)}</td>
                               <td className="calc-cell" style={{color:"#1565c0"}}>
                                 {spZoneGovRate2 ? `NPR ${spGovVal2.toLocaleString("en-NP",{minimumFractionDigits:2,maximumFractionDigits:2})}` : <span style={{color:"var(--text-3)",fontStyle:"italic"}}>—</span>}
                               </td>
@@ -2886,12 +2900,12 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                         })}
                         {(()=>{
                           const gRate = parseFloat(splits[0]?.govRate)||0;
-                          const gVal = gRate * sqmToAana(ca);
+                          const gVal = gRate * pUnitAmt2(ca);
                           const gValR = Math.floor(gVal/100)*100;
                           return (<>
                           <tr style={{background:"#f0ece6",fontWeight:600}}>
                             <td>{p.plotNo||"—"} — Sub-total</td>
-                            <td className="calc-cell">{sqmToAana(ca).toFixed(4)}</td>
+                            <td className="calc-cell">{pUnitStr2(ca)}</td>
                             <td className="highlight" style={{color:"#1565c0"}}>NPR {gVal.toLocaleString("en-NP",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
                             <td className="highlight">NPR {cv.toLocaleString("en-NP",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
                             <td className="highlight">NPR {fv.toLocaleString("en-NP",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
@@ -2912,13 +2926,13 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
 
                   // Single-rate
                   const gRate = parseFloat(rates[p.id]?.govRate)||0;
-                  const gVal = gRate * sqmToAana(ca);
+                  const gVal = gRate * pUnitAmt2(ca);
                   const gValR = Math.floor(gVal/100)*100;
                   return (
                     <React.Fragment key={p.id}>
                       <tr>
                         <td>{p.plotNo||"—"}</td>
-                        <td className="calc-cell">{sqmToAana(ca).toFixed(4)}</td>
+                        <td className="calc-cell">{pUnitStr2(ca)}</td>
                         <td className="highlight" style={{color:"#1565c0"}}>NPR {gVal.toLocaleString("en-NP",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
                         <td className="highlight">NPR {cv.toLocaleString("en-NP",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
                         <td className="highlight">NPR {fv.toLocaleString("en-NP",{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
