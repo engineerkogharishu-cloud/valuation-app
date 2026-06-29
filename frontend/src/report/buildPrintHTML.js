@@ -941,10 +941,12 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
             const rows=[];
             if(cl.showPerson&&cl.person?.name){
               rows.push(`<div style="font-weight:bold;font-size:12pt;color:${T.primary};line-height:1.25">${esc(fullName(cl.person))}</div>`);
+              if(cl.person.address) rows.push(`<div style="font-size:9.5pt;color:#555">${esc(cl.person.address)}</div>`);
               if(cl.person.contact) rows.push(`<div style="font-size:9.5pt;color:#666">Tel. ${esc(cl.person.contact)}</div>`);
             }
             if(cl.showCompany&&cl.company?.name){
               rows.push(`<div style="font-weight:bold;font-size:12pt;color:${T.primary};line-height:1.25">${esc(cl.company.name)}</div>`);
+              if(cl.company.address) rows.push(`<div style="font-size:9.5pt;color:#555">${esc(cl.company.address)}</div>`);
             }
             return rows.join("");
           }).join('<div style="border-top:0.5pt dashed #ddd;margin:2pt 0"></div>')||`<div style="color:#aaa;font-style:italic">—</div>`}
