@@ -1206,7 +1206,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
       <p style="margin-top:2pt;margin-bottom:1pt">we hope you will find this in order. Thanking you for entrusting us with our works and assuring you of our best professional service.</p>
       <p style="margin-bottom:0">Sincerely yours;</p>
     </div>
-    <div style="margin-top:3pt">
+    <div style="margin-top:3pt;page-break-inside:avoid;break-inside:avoid">
       <div style="border-top:1pt solid #000;width:45mm;margin-top:10pt;margin-bottom:2pt"></div>
       <div style="font-size:10pt">For ${esc(vi.company, "Neo- Civic Consulting (P). Ltd")}</div>
       <div style="font-weight:bold;font-size:10pt">${esc(vi.name, "Er. Saakar Rimal")}</div>
@@ -1726,7 +1726,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
     </div>`;
     })()}
 
-    <div style="margin-top:12pt;display:flex;justify-content:flex-end">
+    <div style="margin-top:12pt;display:flex;justify-content:flex-end;page-break-inside:avoid;break-inside:avoid">
       <div style="text-align:center;font-family:'Times New Roman',Times,serif;font-size:10.5pt;line-height:1.5">
         <div style="border-top:1pt solid #000;padding-top:4pt;min-width:180pt">
           <div style="font-weight:bold">For ${esc(vi.company, "Neo-Civic Consulting (P). Ltd")}</div>

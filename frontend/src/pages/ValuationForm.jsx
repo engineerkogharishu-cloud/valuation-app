@@ -1707,7 +1707,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                     </button>
                   )}
                 </div>
-                <div style={{display:"flex",gap:"10px",flexWrap:"wrap",marginBottom:"8px"}}>
+                <div style={{display:"flex",gap:"10px",flexWrap:"wrap",marginBottom:"8px",alignItems:"flex-end"}}>
                   <Field label="Latitude" style={{flex:1,minWidth:"140px"}}>
                     <input type="number" step="any" placeholder="e.g. 27.7172"
                       value={prop.lat||""}
@@ -1720,6 +1720,14 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                       onChange={e=>updateProperty(prop.id,{...prop,lng:e.target.value})}
                       style={{width:"100%"}}/>
                   </Field>
+                  {properties.length > 1 && prop.lat && prop.lng && (
+                    <button
+                      onClick={() => setProperties(ps => ps.map(p => p.id === prop.id ? p : {...p, lat: prop.lat, lng: prop.lng, _mapEnabled: true}))}
+                      title="Copy this lat/lng to all other properties"
+                      style={{padding:"8px 14px",background:"var(--navy)",color:"#fff",border:"none",borderRadius:"var(--radius)",fontWeight:700,fontSize:"12px",cursor:"pointer",whiteSpace:"nowrap",marginBottom:"1px"}}>
+                      📋 Copy to All
+                    </button>
+                  )}
                 </div>
               {/* Two maps stacked top and bottom */}
               <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
