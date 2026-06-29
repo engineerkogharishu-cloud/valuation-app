@@ -44,6 +44,10 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
   const anyBkdMort = mortProps.some(p => _isBkdRate(p));
   const nativeHdr = allBkdMort ? "B-K-D" : anyBkdMort ? "R-A-P-D / B-K-D" : "R-A-P-D";
   const unitHdr = allBkdMort ? "Dhur" : anyBkdMort ? "Aana / Dhur" : "Aana";
+  const allProps = s.properties || [];
+  const _allBkd = allProps.length > 0 && allProps.every(p => p.areaUnit === "bkd");
+  const _anyBkd = allProps.some(p => p.areaUnit === "bkd");
+  const allPropNativeHdr = _allBkd ? "B-K-D" : _anyBkd ? "Native Area" : "R-A-P-D";
 
   const fullName = (person) => [person?.salutation, person?.name].filter(Boolean).join(" ");
 
@@ -727,7 +731,7 @@ ${ownersInfoHTML || `<p style="font-style:italic;color:#aaa">No ${ownerLabel.toL
     </tr>
     <tr>
       <th class="th-light" style="text-align:right">sq.m</th>
-      <th class="th-light" style="text-align:center">R-A-P-D</th>
+      <th class="th-light" style="text-align:center">${allPropNativeHdr}</th>
     </tr>
   </thead>
   <tbody>${propDetailRows || `<tr><td colspan="8" class="empty-cell">No property data</td></tr>`}</tbody>
