@@ -1487,7 +1487,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
       </div>
     </div>
 
-    <div class="ch-head" id="ch-7">Chapter 7 &nbsp;|&nbsp; Remarks, Opinion &amp; Declarations</div>
+    <div class="ch-head page-break" id="ch-7">Chapter 7 &nbsp;|&nbsp; Remarks, Opinion &amp; Declarations</div>
 
     <div class="sec-h3" style="margin-top:1pt">7.1 &nbsp; Remarks and Limiting Conditions</div>
     <div class="remarks-box" style="padding:3pt 8pt;font-size:10pt;line-height:1.25;white-space:normal"><ol type="a" style="margin:0;padding-left:16pt"><li style="margin-bottom:1pt">The opinions of the value are based on the facts and assumptions identified in this report.</li><li style="margin-bottom:1pt">To the best of our knowledge, all matters of factual nature discussed in this report are true and correct.</li><li style="margin-bottom:0">In our opinion this property may be taken as mortgage for the amount recommended in certification.</li></ol></div>
