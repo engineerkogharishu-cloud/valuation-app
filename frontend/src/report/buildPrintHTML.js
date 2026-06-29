@@ -414,10 +414,10 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
       ? (parseFloat(splits2[0].govRate)||0)
       : (parseFloat(r2.govRate)||0);
     const am = parseFloat((s.areaMeasured||{})[p.id])||0;
-    const lSqm = (()=>{if(p.areaUnit==='sqm')return parseFloat(p.areaSqm)||0;const r=p.areaRadp||{};return(parseFloat(r.r)||0)*508.72+(parseFloat(r.a)||0)*31.795+(parseFloat(r.p)||0)*7.949+(parseFloat(r.d)||0)*1.987;})();
+    const lSqm = propAreaSqm(p);
     const ded = parseFloat(((s.deductions||{})[p.id]||{}).area)||0;
     const ca = Math.max(0,(am||lSqm)-ded);
-    return sum + gRate*(ca/31.795);
+    return sum + gRate*(ca/_uf(p));
   },0);
   const finalGovFinal = Math.floor(totalGovFinal/100)*100;
 
@@ -1263,7 +1263,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
           if(p.areaUnit==='radp'){const r=p.areaRadp||{};const parts=[];if(r.r)parts.push(r.r+' Ropani');if(r.a)parts.push(r.a+' Aana');if(r.p)parts.push(r.p+' Paisa');if(r.d)parts.push(r.d+' Dam');return parts.join(' ')||'—';}
           return p.areaSqm?p.areaSqm+' sq.m':'—';
         })();
-        const nativeLabel=p.areaUnit==='bkd'?'B-K-D':'R-A-P-D';
+        const nativeLabel=_isBkdRate(p)?'B-K-D':'R-A-P-D';
         const nativeAreaStr=_nativeStr(p,sqmVal2);
         const sr2=(label,val)=>`<tr><td style="background:${T.info};font-weight:bold;font-size:9pt;width:36%;color:${T.primary};padding:3pt 6pt;border:0.5pt solid #ccc">${label}</td><td style="font-size:10pt;padding:3pt 6pt;border:0.5pt solid #ccc">${val||'—'}</td></tr>`;
         const dur2=transferDuration(p.transferDate);

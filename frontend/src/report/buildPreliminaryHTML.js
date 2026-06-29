@@ -45,8 +45,8 @@ export function buildPreliminaryHTML(s, suggestedFilename, autoPrint = false, ma
   const nativeHdr = allBkdMort ? "B-K-D" : anyBkdMort ? "R-A-P-D / B-K-D" : "R-A-P-D";
   const unitHdr = allBkdMort ? "Dhur" : anyBkdMort ? "Aana / Dhur" : "Aana";
   const allProps = s.properties || [];
-  const _allBkd = allProps.length > 0 && allProps.every(p => p.areaUnit === "bkd");
-  const _anyBkd = allProps.some(p => p.areaUnit === "bkd");
+  const _allBkd = allProps.length > 0 && allProps.every(p => _isBkdRate(p));
+  const _anyBkd = allProps.some(p => _isBkdRate(p));
   const allPropNativeHdr = _allBkd ? "B-K-D" : _anyBkd ? "Native Area" : "R-A-P-D";
 
   const fullName = (person) => [person?.salutation, person?.name].filter(Boolean).join(" ");

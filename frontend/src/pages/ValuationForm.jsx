@@ -1801,8 +1801,8 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
             <table>
               <thead>
                 {(() => {
-                  const allBkd4 = mortgaged.length > 0 && mortgaged.every(p => p.areaUnit === "bkd");
-                  const anyBkd4 = mortgaged.some(p => p.areaUnit === "bkd");
+                  const allBkd4 = mortgaged.length > 0 && mortgaged.every(p => _isBkdRateProp(p));
+                  const anyBkd4 = mortgaged.some(p => _isBkdRateProp(p));
                   const natHdr4 = allBkd4 ? "B-K-D" : anyBkd4 ? "R-A-P-D / B-K-D" : "R-A-P-D";
                   const unitHdr4 = allBkd4 ? "Dhur" : anyBkd4 ? "Aana / Dhur" : "Aana";
                   return (
@@ -1821,12 +1821,12 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                 {mortgaged.length === 0 && <tr><td colSpan={6} className="empty-row">No properties selected for mortgage</td></tr>}
                 {mortgaged.map(p => {
                   const lSqm = propAreaSqm(p);
-                  const nativeStr = p.areaUnit==="bkd"
-                    ? (()=>{ const bv=p.areaBkd||{}; return `${bv.b||0}-${bv.k||0}-${bv.d||0}`; })()
+                  const nativeStr = _isBkdRateProp(p)
+                    ? (()=>{ const x=sqmToBkd(lSqm); return `${x.b}-${x.k}-${parseFloat(x.d).toFixed(3)}`; })()
                     : p.areaUnit==="radp"
                       ? `${p.areaRadp?.r||0}-${p.areaRadp?.a||0}-${p.areaRadp?.p||0}-${p.areaRadp?.d||0}`
                       : (()=>{ const x=sqmToRadp(lSqm); return `${x.r}-${x.a}-${x.p}-${x.d}`; })();
-                  const unitDisplay = p.areaUnit==="bkd"
+                  const unitDisplay = _isBkdRateProp(p)
                     ? sqmToDhur(lSqm).toFixed(3)
                     : sqmToAana(lSqm).toFixed(4);
                   return (
@@ -1882,8 +1882,8 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
             <table>
               <thead>
                 {(() => {
-                  const allBkd5 = mortgaged.length > 0 && mortgaged.every(p => p.areaUnit === "bkd");
-                  const anyBkd5 = mortgaged.some(p => p.areaUnit === "bkd");
+                  const allBkd5 = mortgaged.length > 0 && mortgaged.every(p => _isBkdRateProp(p));
+                  const anyBkd5 = mortgaged.some(p => _isBkdRateProp(p));
                   const natHdr5 = allBkd5 ? "B-K-D" : anyBkd5 ? "R-A-P-D / B-K-D" : "R-A-P-D";
                   const unitHdr5 = allBkd5 ? "Dhur" : anyBkd5 ? "Aana / Dhur" : "Aana";
                   return (
@@ -1907,10 +1907,10 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                   const mSqm = isNaN(mRaw) ? lSqm : mRaw;
                   const dSqm = parseFloat(deductions[p.id]?.area) || 0;
                   const considered = getConsideredArea(p.id);
-                  const nativeConsStr = p.areaUnit === "bkd"
+                  const nativeConsStr = _isBkdRateProp(p)
                     ? (()=>{ const x=sqmToBkd(considered); return `${x.b}-${x.k}-${parseFloat(x.d).toFixed(3)}`; })()
                     : (()=>{ const x=sqmToRadp(considered); return `${x.r}-${x.a}-${x.p}-${x.d}`; })();
-                  const unitConsDisplay = p.areaUnit === "bkd"
+                  const unitConsDisplay = _isBkdRateProp(p)
                     ? sqmToDhur(considered).toFixed(3)
                     : sqmToAana(considered).toFixed(4);
                   return (
@@ -1927,7 +1927,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                 })}
                 {mortgaged.length > 0 && (() => {
                   const totalSqm = mortgaged.reduce((s,p)=>s+getConsideredArea(p.id),0);
-                  const allBkdT = mortgaged.every(p => p.areaUnit === "bkd");
+                  const allBkdT = mortgaged.every(p => _isBkdRateProp(p));
                   const totalNativeStr = allBkdT
                     ? (()=>{ const x=sqmToBkd(totalSqm); return `${x.b}-${x.k}-${parseFloat(x.d).toFixed(3)}`; })()
                     : (()=>{ const x=sqmToRadp(totalSqm); return `${x.r}-${x.a}-${x.p}-${x.d}`; })();
@@ -2783,7 +2783,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                   const splits = plotRateSplits[p.id]||[];
                   const hasSplits = splits.length > 0;
 
-                  const isBkdP = p.areaUnit === "bkd";
+                  const isBkdP = _isBkdRateProp(p);
                   const pNativeStr = (sqm) => {
                     if (isBkdP) { const x=sqmToBkd(sqm); return `${x.b}-${Math.floor(x.k)}-${x.d.toFixed(2)}`; }
                     const {r:rr,a:aa,p:pp2,d:dd}=sqmToRadp(sqm); return `${rr}-${aa}-${pp2}-${dd}`;
@@ -2879,7 +2879,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                   const fvR = Math.floor(fv / 100) * 100;
                   const dvR = Math.floor(fvR * distressMultiplier / 100) * 100;
 
-                  const isBkdP2 = p.areaUnit === "bkd";
+                  const isBkdP2 = _isBkdRateProp(p);
                   const pUf2 = _propUnitFactor(p.id);
                   const pUnitStr2 = (sqm) => isBkdP2 ? sqmToDhur(sqm).toFixed(3) : sqmToAana(sqm).toFixed(4);
                   const pUnitAmt2 = (sqm) => sqm / pUf2;
