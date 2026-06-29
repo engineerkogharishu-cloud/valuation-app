@@ -36,7 +36,7 @@ const _ul  = (p) => _isBkdRate(p) ? "Dhur" : "Aana";
 const _ud  = (p, sqm) => _isBkdRate(p) ? sqmToDhur(sqm).toFixed(3) : sqmToAana(sqm).toFixed(4);
 const _uda = (p, sqm) => _isBkdRate(p) ? sqmToDhur(sqm) : sqmToAana(sqm);
 const _nativeStr = (p, sqm) => {
-  if (p.areaUnit === "bkd") { const x=sqmToBkd(sqm); return `${x.b}-${x.k}-${parseFloat(x.d).toFixed(3)}`; }
+  if (_isBkdRate(p)) { const x=sqmToBkd(sqm); return `${x.b}-${x.k}-${parseFloat(x.d).toFixed(3)}`; }
   const x=sqmToRadp(sqm); return `${x.r}-${x.a}-${x.p}-${x.d}`;
 };
 
@@ -138,7 +138,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
     const dur = transferDuration(p.transferDate);
     return `<tr>
       <td>${esc(p.plotNo)}</td><td>${esc(p.traceSheetNo)}</td><td>${esc(p.landType)}</td><td>${esc(p.category)}</td>
-      <td>${p.areaUnit==="bkd"?`${p.areaBkd?.b||0}-${p.areaBkd?.k||0}-${p.areaBkd?.d||0} (B-K-D)`:p.areaUnit==="radp"?`${p.areaRadp?.r||0}-${p.areaRadp?.a||0}-${p.areaRadp?.p||0}-${p.areaRadp?.d||0} (R-A-P-D)`:`${p.areaSqm||0} sq.m`}</td>
+      <td>${_isBkdRate(p)?`${_nativeStr(p,sqm)} (B-K-D)`:p.areaUnit==="radp"?`${p.areaRadp?.r||0}-${p.areaRadp?.a||0}-${p.areaRadp?.p||0}-${p.areaRadp?.d||0} (R-A-P-D)`:`${p.areaSqm||0} sq.m`}</td>
       <td>${sqm.toFixed(3)}</td><td>${_nativeStr(p,sqm)}</td>
       <td>${esc(p.ownerName)}</td><td>${esc(p.addressLalpurja)}</td><td>${esc(p.presentAddress)}</td>
       <td>${esc(p.modeOfTransfer)}</td>
@@ -1089,7 +1089,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
           if(!p)return'—';
           const sqm=propAreaSqm(p);
           const sqmStr=sqm>0?sqm.toFixed(2)+' sq.m':'—';
-          if(p.areaUnit==='bkd'){const b=p.areaBkd||{};const nat=[b.b&&b.b+' Bigha',b.k&&b.k+' Kattha',b.d&&b.d+' Dhur'].filter(Boolean).join(' ')||'—';return sqm>0?`${sqmStr} (${nat})`:`${nat}`;}
+          if(_isBkdRate(p)){const nat=_nativeStr(p,sqm);return sqm>0?`${sqmStr} (${nat} B-K-D)`:`${nat} B-K-D`;}
           if(p.areaUnit==='radp'){const r=p.areaRadp||{};const nat=[r.r&&r.r+'-R',r.a&&r.a+'-A',r.p&&r.p+'-P',r.d&&r.d+'-D'].filter(Boolean).join(' ')||'—';return sqm>0?`${sqmStr} (${nat})`:`${nat}`;}
           return sqmStr;
         };

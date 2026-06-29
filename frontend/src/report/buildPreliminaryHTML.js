@@ -5,7 +5,7 @@ const _ul  = (p) => _isBkdRate(p) ? "Dhur" : "Aana";
 const _ud  = (p, sqm) => _isBkdRate(p) ? sqmToDhur(sqm).toFixed(3) : sqmToAana(sqm).toFixed(4);
 const _uda = (p, sqm) => _isBkdRate(p) ? sqmToDhur(sqm) : sqmToAana(sqm);
 const _nativeStr = (p, sqm) => {
-  if (p.areaUnit === "bkd") { const x=sqmToBkd(sqm); return `${x.b}-${x.k}-${parseFloat(x.d).toFixed(3)}`; }
+  if (_isBkdRate(p)) { const x=sqmToBkd(sqm); return `${x.b}-${x.k}-${parseFloat(x.d).toFixed(3)}`; }
   const x=sqmToRadp(sqm); return `${x.r}-${x.a}-${x.p}-${x.d}`;
 };
 import { toWords } from "../utils/numberWords";
