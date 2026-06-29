@@ -137,7 +137,7 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
     const dur = transferDuration(p.transferDate);
     return `<tr>
       <td>${esc(p.plotNo)}</td><td>${esc(p.traceSheetNo)}</td><td>${esc(p.landType)}</td><td>${esc(p.category)}</td>
-      <td>${p.areaUnit==="radp"?`${p.areaRadp?.r||0}-${p.areaRadp?.a||0}-${p.areaRadp?.p||0}-${p.areaRadp?.d||0}`:`${p.areaSqm||0} sq.m`}</td>
+      <td>${p.areaUnit==="bkd"?`${p.areaBkd?.b||0}-${p.areaBkd?.k||0}-${p.areaBkd?.d||0} (B-K-D)`:p.areaUnit==="radp"?`${p.areaRadp?.r||0}-${p.areaRadp?.a||0}-${p.areaRadp?.p||0}-${p.areaRadp?.d||0} (R-A-P-D)`:`${p.areaSqm||0} sq.m`}</td>
       <td>${sqm.toFixed(3)}</td><td>${_nativeStr(p,sqm)}</td>
       <td>${esc(p.ownerName)}</td><td>${esc(p.addressLalpurja)}</td><td>${esc(p.presentAddress)}</td>
       <td>${esc(p.modeOfTransfer)}</td>
@@ -1247,12 +1247,17 @@ export function buildPrintHTML(s, suggestedFilename, autoPrint = false, mapSnaps
     <div class="sec-h3">1.4 &nbsp; Property Register Details</div>
     ${(s.properties||[]).length===0 ? `<p style="font-style:italic;color:#888;padding:10pt">No property data entered.</p>` :
       (s.properties||[]).map((p,pi)=>{
-        const sqmVal2=(()=>{if(p.areaUnit==='sqm')return parseFloat(p.areaSqm)||0;const r=p.areaRadp||{};return(parseFloat(r.r)||0)*508.72+(parseFloat(r.a)||0)*31.795+(parseFloat(r.p)||0)*7.949+(parseFloat(r.d)||0)*1.987;})();
-        const lalpurjaArea=(()=>{if(p.areaUnit==='radp'){const r=p.areaRadp||{};const parts=[];if(r.r)parts.push(r.r+' Ropani');if(r.a)parts.push(r.a+' Aana');if(r.p)parts.push(r.p+' Paisa');if(r.d)parts.push(r.d+' Dam');return parts.join(' ')||'—';}return p.areaSqm?p.areaSqm+' sq.m':'—';})();
-        const radpStr=p.areaUnit==='radp'?`${p.areaRadp?.r||0}-${p.areaRadp?.a||0}-${p.areaRadp?.p||0}-${p.areaRadp?.d||0}`:`${Math.floor(sqmVal2/508.72)}-${Math.floor((sqmVal2%508.72)/31.795)}-${Math.floor((sqmVal2%31.795)/7.949)}-${Math.floor((sqmVal2%7.949)/1.987)}`;
+        const sqmVal2=propAreaSqm(p);
+        const lalpurjaArea=(()=>{
+          if(p.areaUnit==='bkd'){const b=p.areaBkd||{};const parts=[];if(b.b)parts.push(b.b+' Bigha');if(b.k)parts.push(b.k+' Kattha');if(b.d)parts.push(b.d+' Dhur');return parts.join(' ')||'—';}
+          if(p.areaUnit==='radp'){const r=p.areaRadp||{};const parts=[];if(r.r)parts.push(r.r+' Ropani');if(r.a)parts.push(r.a+' Aana');if(r.p)parts.push(r.p+' Paisa');if(r.d)parts.push(r.d+' Dam');return parts.join(' ')||'—';}
+          return p.areaSqm?p.areaSqm+' sq.m':'—';
+        })();
+        const nativeLabel=p.areaUnit==='bkd'?'B-K-D':'R-A-P-D';
+        const nativeAreaStr=_nativeStr(p,sqmVal2);
         const sr2=(label,val)=>`<tr><td style="background:${T.info};font-weight:bold;font-size:9pt;width:36%;color:${T.primary};padding:3pt 6pt;border:0.5pt solid #ccc">${label}</td><td style="font-size:10pt;padding:3pt 6pt;border:0.5pt solid #ccc">${val||'—'}</td></tr>`;
         const dur2=transferDuration(p.transferDate);
-        return `<div style="margin-bottom:4pt;break-inside:avoid"><div style="background:${T.lighter};color:${T.primary};padding:3pt 7pt;font-weight:bold;font-size:9.5pt;border-left:3pt solid ${T.primary}">Property ${pi+1} &nbsp;|&nbsp; Plot No. ${esc(p.plotNo)} &nbsp;|&nbsp; Trace Sheet No. ${esc(p.traceSheetNo)}</div><table style="width:100%;border-collapse:collapse">${sr2('Plot No. (Kitta)',esc(p.plotNo))}${sr2('Trace Sheet No.',esc(p.traceSheetNo))}${sr2('Name of Owner',esc(p.ownerName))}${sr2('Type of Land',esc(p.landType))}${sr2('Category of Land',esc(p.category))}${sr2('Type of Ownership',esc(p.ownershipType))}${sr2('Area as per Lalpurja',lalpurjaArea)}${sr2('Area (sq.m)',sqmVal2>0?sqmVal2.toFixed(2)+' sq.m':'—')}${sr2('Area (R-A-P-D)',radpStr)}${sr2('Address as per Lalpurja',esc(p.addressLalpurja))}${sr2('Present Address',esc(p.presentAddress))}${sr2('Google Plus Code',esc(p.googlePlusCode))}${sr2('Latitude / Longitude',(p.lat&&p.lng)?p.lat+' / '+p.lng:'—')}${sr2('Mode of Transfer',esc(p.modeOfTransfer))}${sr2('Transfer Date (BS)',p.transferDate?(esc(p.transferDate)+(dur2?` <span style="font-size:8.5pt;color:#555">(${dur2})</span>`:'')):'—')}</table></div>`;
+        return `<div style="margin-bottom:4pt;break-inside:avoid"><div style="background:${T.lighter};color:${T.primary};padding:3pt 7pt;font-weight:bold;font-size:9.5pt;border-left:3pt solid ${T.primary}">Property ${pi+1} &nbsp;|&nbsp; Plot No. ${esc(p.plotNo)} &nbsp;|&nbsp; Trace Sheet No. ${esc(p.traceSheetNo)}</div><table style="width:100%;border-collapse:collapse">${sr2('Plot No. (Kitta)',esc(p.plotNo))}${sr2('Trace Sheet No.',esc(p.traceSheetNo))}${sr2('Name of Owner',esc(p.ownerName))}${sr2('Type of Land',esc(p.landType))}${sr2('Category of Land',esc(p.category))}${sr2('Type of Ownership',esc(p.ownershipType))}${sr2('Area as per Lalpurja',lalpurjaArea)}${sr2('Area (sq.m)',sqmVal2>0?sqmVal2.toFixed(2)+' sq.m':'—')}${sr2(`Area (${nativeLabel})`,nativeAreaStr)}${sr2('Address as per Lalpurja',esc(p.addressLalpurja))}${sr2('Present Address',esc(p.presentAddress))}${sr2('Google Plus Code',esc(p.googlePlusCode))}${sr2('Latitude / Longitude',(p.lat&&p.lng)?p.lat+' / '+p.lng:'—')}${sr2('Mode of Transfer',esc(p.modeOfTransfer))}${sr2('Transfer Date (BS)',p.transferDate?(esc(p.transferDate)+(dur2?` <span style="font-size:8.5pt;color:#555">(${dur2})</span>`:'')):'—')}</table></div>`;
       }).join('')
     }
 
