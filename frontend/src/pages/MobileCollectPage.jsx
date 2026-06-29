@@ -177,8 +177,11 @@ export default function MobileCollectPage({ token, shortCode }) {
   const removePlot = (i) => setPlotNos(p => p.filter((_, idx) => idx !== i));
 
   // ── Area ──────────────────────────────────────────────────
-  const [area, setArea] = useState({ r: "", a: "", p: "", d: "" });
-  const setAreaField = (k) => (e) => setArea(a => ({ ...a, [k]: e.target.value }));
+  const [areaUnit, setAreaUnit] = useState("radp"); // "radp" | "bkd"
+  const [area,     setArea]     = useState({ r: "", a: "", p: "", d: "" });
+  const [areaBkd,  setAreaBkd]  = useState({ b: "", k: "", d: "" });
+  const setAreaField    = (k) => (e) => setArea(a => ({ ...a, [k]: e.target.value }));
+  const setAreaBkdField = (k) => (e) => setAreaBkd(a => ({ ...a, [k]: e.target.value }));
 
   // ── Roads ─────────────────────────────────────────────────
   const EMPTY_ROAD = { type: "", width: "", side: "", surface: "", remarks: "" };
@@ -323,7 +326,9 @@ export default function MobileCollectPage({ token, shortCode }) {
         ...form,
         plotNos: plotNos.map(p => p.no.trim()).filter(Boolean),
         traceSheets: Object.fromEntries(plotNos.filter(p => p.no.trim()).map(p => [p.no.trim(), p.traceSheet])),
+        areaUnit,
         area,
+        areaBkd,
         roads: roads.filter(r => r.type || r.width || r.side),
         building: hasBuilding === "yes" ? { ...building, present: true, specs } : { present: false, status: hasBuilding },
         hazards,
@@ -363,7 +368,7 @@ export default function MobileCollectPage({ token, shortCode }) {
   const resetForm = () => {
     setForm({ submitterName: "", visitDate: todayISO(), bank: "", branch: "", clientName: "", ownerName: "", location: "", addressLalpurja: "", lat: "", lng: "", googlePlusCode: "", landType: "", landCategory: "", ownershipType: "", faceDirection: "", landMarketRate: "", buildingRate: "", notes: "" });
     setPlotNos([{ no: "", traceSheet: "" }]);
-    setArea({ r: "", a: "", p: "", d: "" });
+    setAreaUnit("radp"); setArea({ r: "", a: "", p: "", d: "" }); setAreaBkd({ b: "", k: "", d: "" });
     setRoads([{ ...EMPTY_ROAD }]);
     setHasBuilding(null); setBuilding({ numFloors: "", structureType: "", foundationType: "", faceDirection: "", totalAreaSqft: "", remarks: "" }); setSpecs({ ...RCC_DEFAULTS });
     setHazards(EMPTY_HAZARDS); setPhotos([]); setDocChecks({}); setCustomDocs([]); setNewDocText(""); setIsCompany(false); setIsBuySell(false); setSubmitted(false); setSubmitError("");
@@ -475,15 +480,38 @@ export default function MobileCollectPage({ token, shortCode }) {
 
           {/* Area */}
           <div style={{ ...S.groupBox, marginBottom: 14 }}>
-            <div style={S.groupTitle}>Area (Ropani-Aana-Paisa-Dam)</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              {[["r","Ro."],["a","Aa."],["p","Pa."],["d","Dam"]].map(([k, lbl]) => (
-                <div key={k} style={{ flex: 1 }}>
-                  <div style={S.subLabel}>{lbl}</div>
-                  <input style={{ ...S.input, textAlign: "center" }} type="number" min="0" value={area[k]} onChange={setAreaField(k)} placeholder="0" />
-                </div>
-              ))}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <div style={S.groupTitle}>Area</div>
+              <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: "1px solid #d0d0d0" }}>
+                {[["radp","Ro-Aa-Pa-Dam"],["bkd","Bi-Ka-Dhur"]].map(([val, lbl]) => (
+                  <button key={val} type="button" onClick={() => setAreaUnit(val)}
+                    style={{ padding: "4px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer", border: "none",
+                      background: areaUnit === val ? "#2563eb" : "#f5f5f5",
+                      color: areaUnit === val ? "#fff" : "#555" }}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
             </div>
+            {areaUnit === "radp" ? (
+              <div style={{ display: "flex", gap: 8 }}>
+                {[["r","Ro."],["a","Aa."],["p","Pa."],["d","Dam"]].map(([k, lbl]) => (
+                  <div key={k} style={{ flex: 1 }}>
+                    <div style={S.subLabel}>{lbl}</div>
+                    <input style={{ ...S.input, textAlign: "center" }} type="number" min="0" value={area[k]} onChange={setAreaField(k)} placeholder="0" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 8 }}>
+                {[["b","Bigha"],["k","Kattha"],["d","Dhur"]].map(([k, lbl]) => (
+                  <div key={k} style={{ flex: 1 }}>
+                    <div style={S.subLabel}>{lbl}</div>
+                    <input style={{ ...S.input, textAlign: "center" }} type="number" min="0" value={areaBkd[k]} onChange={setAreaBkdField(k)} placeholder="0" />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <Row2>
@@ -575,7 +603,7 @@ export default function MobileCollectPage({ token, shortCode }) {
         {/* ── 7. MARKET RATES ── */}
         <Section icon="📊" title="Market Rates">
           <Row2>
-            <FL label={<>Land Rate <span style={S.unit}>(Rs./aana)</span></>}>
+            <FL label={<>Land Rate <span style={S.unit}>{areaUnit === "bkd" ? "(Rs./dhur)" : "(Rs./aana)"}</span></>}>
               <input style={S.input} type="number" min="0" value={form.landMarketRate} onChange={set("landMarketRate")} placeholder="0" />
             </FL>
             <FL label={<>Building Rate <span style={S.unit}>(Rs./sq.ft)</span></>}>

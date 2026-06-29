@@ -26,7 +26,9 @@ function toFormState(data, photos) {
     ? data.plotNos
     : [data.plotNo || ""];
   const traceSheets = data.traceSheets || {};
-  const ar = data.area || {};
+  const ar   = data.area    || {};
+  const abkd = data.areaBkd || {};
+  const isBkd = data.areaUnit === "bkd";
 
   const properties = plotNos.map((plotNo, i) => ({
     id: uid(),
@@ -36,10 +38,10 @@ function toFormState(data, photos) {
     addressLalpurja: data.addressLalpurja || "",
     presentAddress:  data.location        || "",
     category:        data.landCategory    || "",
-    areaUnit:        "radp",
+    areaUnit:        isBkd ? "bkd" : "radp",
     areaSqm:         "",
     areaRadp: { r: ar.r || "", a: ar.a || "", p: ar.p || "", d: ar.d || "" },
-    areaBkd:  { b: "", k: "", d: "" },
+    areaBkd:  { b: abkd.b || "", k: abkd.k || "", d: abkd.d || "" },
     ownershipType:   data.ownershipType   || "",
     faceDirection:   data.faceDirection   || "",
     ownerName:       data.ownerName || data.clientName || "",
