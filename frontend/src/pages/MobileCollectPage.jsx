@@ -167,6 +167,7 @@ export default function MobileCollectPage({ token, shortCode }) {
     landMarketRate: "", buildingRate: "", notes: "",
   });
   const [isCompany, setIsCompany] = useState(false);
+  const [isBuySell, setIsBuySell] = useState(false);
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
   // ── Plot numbers ──────────────────────────────────────────
@@ -225,27 +226,28 @@ export default function MobileCollectPage({ token, shortCode }) {
   const [newDocText,  setNewDocText]  = useState("");
 
   // Derives the full label list from current form state — used in both render and payload
-  const buildDocList = (clientName, ownerName, isCompanyFlag, hasBldg, extras) => {
+  const buildDocList = (clientName, ownerName, isCompanyFlag, hasBldg, extras, buySell) => {
     const labels = [];
     const client = clientName.trim();
     const owner  = ownerName.trim();
+    const clientLabel = buySell ? "Buyer"  : "Client";
+    const ownerLabel  = buySell ? "Seller" : "Owner";
     // Person citizenship
     if (client) {
-      if (owner && owner !== client) {
-        labels.push(`Citizenship of Client — ${client}`);
-      } else if (owner && owner === client) {
-        labels.push(`Citizenship — ${client} (Client & Owner)`);
+      if (owner && owner === client) {
+        labels.push(`Citizenship — ${client} (${clientLabel} & ${ownerLabel})`);
       } else {
-        labels.push(`Citizenship of Client — ${client}`);
+        labels.push(`Citizenship of ${clientLabel} — ${client}`);
+        if (owner) labels.push(`Citizenship of ${ownerLabel} — ${owner}`);
       }
+    } else if (owner) {
+      labels.push(`Citizenship of ${ownerLabel} — ${owner}`);
     }
-    if (owner && owner !== client) labels.push(`Citizenship of Owner — ${owner}`);
+    // Buy/sell specific
+    if (buySell) labels.push("Sale Deed / Agreement to Sale");
     // Company docs
     if (isCompanyFlag) {
-      labels.push("Company Registration");
-      labels.push("Company PAN");
-      labels.push("Company Tax Clearance");
-      labels.push("Share Lagat");
+      labels.push("Company Registration", "Company PAN", "Company Tax Clearance", "Share Lagat");
     }
     // Land docs
     labels.push(
@@ -312,7 +314,7 @@ export default function MobileCollectPage({ token, shortCode }) {
 
   // ── Build payload ─────────────────────────────────────────
   const buildPayload = () => {
-    const allDocLabels = buildDocList(form.clientName, form.ownerName, isCompany, hasBuilding, customDocs);
+    const allDocLabels = buildDocList(form.clientName, form.ownerName, isCompany, hasBuilding, customDocs, isBuySell);
     const missingDocs = allDocLabels.filter(l => !docChecks[l]);
     const availableDocs = allDocLabels.filter(l => !!docChecks[l]);
     return {
@@ -325,6 +327,7 @@ export default function MobileCollectPage({ token, shortCode }) {
         roads: roads.filter(r => r.type || r.width || r.side),
         building: hasBuilding === "yes" ? { ...building, present: true, specs } : { present: false, status: hasBuilding },
         hazards,
+        isBuySell,
         missingDocs,
         availableDocs,
       },
@@ -363,7 +366,7 @@ export default function MobileCollectPage({ token, shortCode }) {
     setArea({ r: "", a: "", p: "", d: "" });
     setRoads([{ ...EMPTY_ROAD }]);
     setHasBuilding(null); setBuilding({ numFloors: "", structureType: "", foundationType: "", faceDirection: "", totalAreaSqft: "", remarks: "" }); setSpecs({ ...RCC_DEFAULTS });
-    setHazards(EMPTY_HAZARDS); setPhotos([]); setDocChecks({}); setCustomDocs([]); setNewDocText(""); setIsCompany(false); setSubmitted(false); setSubmitError("");
+    setHazards(EMPTY_HAZARDS); setPhotos([]); setDocChecks({}); setCustomDocs([]); setNewDocText(""); setIsCompany(false); setIsBuySell(false); setSubmitted(false); setSubmitError("");
   };
 
   // ── Render ────────────────────────────────────────────────
@@ -430,14 +433,29 @@ export default function MobileCollectPage({ token, shortCode }) {
           </FL>
         </Section>
 
-        {/* ── 2. CLIENT ── */}
-        <Section icon="👤" title="Client / Borrower">
-          <FL label="Full Name *"><input style={S.input} value={form.clientName} onChange={set("clientName")} placeholder="Full name of client" autoComplete="off" /></FL>
+        {/* ── 2. CLIENT / BUYER ── */}
+        <Section icon="👤" title={isBuySell ? "Buyer" : "Client / Borrower"}>
+          {/* Buy/Sell toggle */}
+          <button type="button" onClick={() => setIsBuySell(v => !v)}
+            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", border: `1.5px solid ${isBuySell ? "#e67e22" : "#ddd"}`, borderRadius: 8, padding: "10px 12px", background: isBuySell ? "#fff3e0" : "#f9fafb", cursor: "pointer", marginBottom: 14, textAlign: "left" }}>
+            <span style={{ width: 20, height: 20, borderRadius: 4, border: `1.5px solid ${isBuySell ? "#e67e22" : "#ccc"}`, background: isBuySell ? "#e67e22" : "#f5f5f5", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#fff", fontWeight: 700, flexShrink: 0 }}>
+              {isBuySell ? "✓" : ""}
+            </span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: isBuySell ? "#c0540a" : "#555" }}>Buy / Sell Transaction</div>
+              <div style={{ fontSize: 12, color: isBuySell ? "#c0540a" : "#888", marginTop: 1 }}>{isBuySell ? "Client = Buyer, Owner = Seller" : "Standard mortgage / valuation"}</div>
+            </div>
+          </button>
+          <FL label={`${isBuySell ? "Buyer" : "Client"} Full Name *`}>
+            <input style={S.input} value={form.clientName} onChange={set("clientName")} placeholder={`Full name of ${isBuySell ? "buyer" : "client"}`} autoComplete="off" />
+          </FL>
         </Section>
 
-        {/* ── 3. OWNER ── */}
-        <Section icon="🏠" title="Property Owner">
-          <FL label="Owner Name"><input style={S.input} value={form.ownerName} onChange={set("ownerName")} placeholder="If different from client" autoComplete="off" /></FL>
+        {/* ── 3. OWNER / SELLER ── */}
+        <Section icon="🏠" title={isBuySell ? "Seller" : "Property Owner"}>
+          <FL label={`${isBuySell ? "Seller" : "Owner"} Name`}>
+            <input style={S.input} value={form.ownerName} onChange={set("ownerName")} placeholder={isBuySell ? "Full name of seller" : "If different from client"} autoComplete="off" />
+          </FL>
         </Section>
 
         {/* ── 4. LAND ── */}
@@ -756,15 +774,18 @@ export default function MobileCollectPage({ token, shortCode }) {
           {(() => {
             const client = form.clientName.trim();
             const owner  = form.ownerName.trim();
+            const cLabel = isBuySell ? "Buyer" : "Client";
+            const oLabel = isBuySell ? "Seller" : "Owner";
 
             // Person / citizenship section
             const personDocs = [];
             if (client) {
-              if (owner && owner === client) personDocs.push(`Citizenship — ${client} (Client & Owner)`);
-              else { personDocs.push(`Citizenship of Client — ${client}`); if (owner) personDocs.push(`Citizenship of Owner — ${owner}`); }
+              if (owner && owner === client) personDocs.push(`Citizenship — ${client} (${cLabel} & ${oLabel})`);
+              else { personDocs.push(`Citizenship of ${cLabel} — ${client}`); if (owner) personDocs.push(`Citizenship of ${oLabel} — ${owner}`); }
             } else if (owner) {
-              personDocs.push(`Citizenship of Owner — ${owner}`);
+              personDocs.push(`Citizenship of ${oLabel} — ${owner}`);
             }
+            if (isBuySell) personDocs.push("Sale Deed / Agreement to Sale");
 
             // Company docs
             const companyDocs = isCompany ? ["Company Registration", "Company PAN", "Company Tax Clearance", "Share Lagat"] : [];
@@ -782,7 +803,7 @@ export default function MobileCollectPage({ token, shortCode }) {
               : [];
 
             const sections = [
-              { label: "Person", color: "#1a73e8", docs: personDocs },
+              { label: isBuySell ? "Buyer / Seller" : "Person", color: "#1a73e8", docs: personDocs },
               { label: "Company", color: "#b45309", docs: companyDocs },
               { label: "Land", color: "#0f766e", docs: landDocs },
               { label: "Building", color: "#be185d", docs: buildingDocs },
@@ -827,7 +848,7 @@ export default function MobileCollectPage({ token, shortCode }) {
 
           {/* Missing summary */}
           {(() => {
-            const allLabels = buildDocList(form.clientName, form.ownerName, isCompany, hasBuilding, customDocs);
+            const allLabels = buildDocList(form.clientName, form.ownerName, isCompany, hasBuilding, customDocs, isBuySell);
             const missing = allLabels.filter(l => !docChecks[l]);
             if (missing.length === 0) return <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "#e8f5e9", border: "1.5px solid #27ae60", color: "#1a5c3a", fontWeight: 700, fontSize: 13 }}>✅ All documents available</div>;
             return (
