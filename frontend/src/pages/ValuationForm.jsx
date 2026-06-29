@@ -4843,8 +4843,9 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                     );
                   })}
                   {pdfPages && pdfPages.length === 0 && (
-                    <div style={{color:"#f88",textAlign:"center",padding:"40px"}}>
-                      Could not render PDF pages. Use Save to download.
+                    <div style={{color:"#f88",textAlign:"center",padding:"40px",lineHeight:1.7}}>
+                      Could not render PDF — the file may have been corrupted during a previous save.<br/>
+                      <span style={{fontSize:"13px",color:"#fbb"}}>Please remove this file and re-upload it, then save the report again.</span>
                     </div>
                   )}
                 </div>
