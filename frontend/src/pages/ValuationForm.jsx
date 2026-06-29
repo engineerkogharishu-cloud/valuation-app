@@ -1005,7 +1005,7 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
   const totalGovValue = mortgaged.reduce((sum, p) => {
     const gRate = getGovRateForPlot(p.id);
     const ca = getConsideredArea(p.id);
-    return sum + (gRate * sqmToAana(ca));
+    return sum + (gRate * ca / _propUnitFactor(p.id));
   }, 0);
   const finalGovValue = Math.floor(totalGovValue / 100) * 100;
 
@@ -3223,11 +3223,14 @@ export default function ValuationForm({ reportId: initialReportId, initialState,
                 {mortgaged.map(p=>{
                   const gRate = getGovRateForPlot(p.id);
                   const ca = getConsideredArea(p.id);
-                  const gVal = Math.floor(gRate * sqmToAana(ca) / 100) * 100;
+                  const pUf = _propUnitFactor(p.id);
+                  const pUl = _propUnitLabel(p.id);
+                  const pUnitAmt = ca / pUf;
+                  const gVal = Math.floor(gRate * pUnitAmt / 100) * 100;
                   if (!gRate) return null;
                   return (
                     <div key={p.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 10px",marginBottom:"4px",background:"#fff",borderRadius:"5px",fontSize:"13px",border:"1px solid #bbdefb"}}>
-                      <span>Plot No. {p.plotNo||"—"} <span style={{fontSize:"11px",color:"#666"}}>({gRate.toLocaleString("en-NP")} NPR/Anna × {sqmToAana(ca).toFixed(4)} Anna)</span></span>
+                      <span>Plot No. {p.plotNo||"—"} <span style={{fontSize:"11px",color:"#666"}}>({gRate.toLocaleString("en-NP")} NPR/{pUl} × {pUnitAmt.toFixed(p.areaUnit==="bkd"?3:4)} {pUl})</span></span>
                       <strong>NPR {gVal.toLocaleString("en-NP")}</strong>
                     </div>
                   );
