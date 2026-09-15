@@ -1,0 +1,23 @@
+# =============================================================================
+#  Netlify configuration — MOBILE FIELD-COLLECTION SITE (FINAL_DEPLOYMENT/mobile)
+#  No build step: a single static HTML file.
+#  Deploy as its own Netlify site with publish directory "mobile" and an empty
+#  build command, or drag the folder to netlify.com/drop.
+#
+#  IMPORTANT: this page has no build step, so it cannot read env variables.
+#  Edit window.FIELD_API_BASE near the bottom of index.html to point at your
+#  backend before deploying.
+# =============================================================================
+
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options           = "DENY"
+    X-Content-Type-Options    = "nosniff"
+    Referrer-Policy           = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"

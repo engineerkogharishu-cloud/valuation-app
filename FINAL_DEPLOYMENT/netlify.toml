@@ -1,0 +1,64 @@
+# =============================================================================
+#  Netlify configuration — MAIN FRONTEND SITE (FINAL_DEPLOYMENT/frontend)
+#
+#  This file applies only when FINAL_DEPLOYMENT is the repository root, or when
+#  the site's base directory is set to FINAL_DEPLOYMENT in the Netlify UI.
+#  If the whole monorepo is connected instead, Netlify reads the netlify.toml at
+#  the repo ROOT — the one a level above this package — which already points at
+#  FINAL_DEPLOYMENT/frontend. Keep the two in sync.
+#
+#  Set VITE_API_URL in Site settings → Environment variables before building.
+# =============================================================================
+
+[build]
+  base    = "frontend"
+  command = "npm ci && npm run build"
+  publish = "build"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# SPA fallback — required so deep links like /collect/ABC123 survive a refresh.
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# ── Security headers ─────────────────────────────────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options           = "DENY"
+    X-Content-Type-Options    = "nosniff"
+    Referrer-Policy           = "strict-origin-when-cross-origin"
+    Permissions-Policy        = "camera=(self), microphone=(), payment=(), usb=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Cross-Origin-Opener-Policy = "same-origin"
+
+    # ── Content-Security-Policy ──────────────────────────────────────────────
+    # Disabled by default because `connect-src` must name YOUR backend origin
+    # and getting it wrong silently breaks every API call. To enable it:
+    #   1. replace https://YOUR-BACKEND.up.railway.app with your real backend
+    #   2. uncomment the line below
+    #   3. deploy, then load the app and confirm the browser console is clean
+    #
+    # The listed third-party hosts are all genuinely used by the app:
+    #   unpkg.com          → Leaflet (maps)
+    #   cdnjs.cloudflare.com → html2canvas, pdf.js, DOMPurify (report export)
+    #   *.tile.openstreetmap.org → map tiles
+    #   nominatim.openstreetmap.org → address lookup
+    #   fonts.googleapis.com / fonts.gstatic.com → Poppins, IBM Plex Mono
+    #
+    # Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://unpkg.com; connect-src 'self' https://YOUR-BACKEND.up.railway.app https://nominatim.openstreetmap.org; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'"
+
+# Fingerprinted assets are immutable — cache them hard.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# The HTML shell must never be cached, or users get a stale bundle reference.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

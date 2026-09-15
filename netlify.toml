@@ -1,9 +1,51 @@
+# =============================================================================
+#  REPO-ROOT Netlify configuration.
+#
+#  Netlify reads the netlify.toml at the REPOSITORY ROOT — this file — unless a
+#  base directory is set in the site UI. It therefore has to point at the
+#  deployment package, or a repo-connected build would silently ship the older
+#  top-level `frontend/` copy instead.
+#
+#  The authoritative frontend config lives in FINAL_DEPLOYMENT/netlify.toml and
+#  is mirrored below; keep the two in sync, or deploy FINAL_DEPLOYMENT as its
+#  own repo root so only that file applies.
+#
+#  Set VITE_API_URL in Site settings -> Environment variables before building.
+# =============================================================================
+
 [build]
-  base    = "frontend"
-  command = "npm run build"
+  base    = "FINAL_DEPLOYMENT/frontend"
+  command = "npm ci && npm run build"
   publish = "build"
 
+[build.environment]
+  NODE_VERSION = "22"
+
+# SPA fallback — required so deep links like /collect/ABC123 survive a refresh.
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
   status = 200
+
+# ── Security headers ─────────────────────────────────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options           = "DENY"
+    X-Content-Type-Options    = "nosniff"
+    Referrer-Policy           = "strict-origin-when-cross-origin"
+    Permissions-Policy        = "camera=(self), microphone=(), payment=(), usb=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Cross-Origin-Opener-Policy = "same-origin"
+
+# Fingerprinted assets are immutable — cache them hard.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# The HTML shell must never be cached, or users get a stale bundle reference.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

@@ -1,0 +1,19 @@
+{
+  "name": "nepal-valuation-app",
+  "version": "1.0.0",
+  "description": "Mulyanka — Nepal Property Valuation Report (React 18 + Vite 6 + Express 4 + Turso/libSQL)",
+  "private": true,
+  "scripts": {
+    "install:all":    "npm --prefix backend ci && npm --prefix frontend ci",
+    "dev:backend":    "npm --prefix backend run dev",
+    "dev:frontend":   "npm --prefix frontend start",
+    "build":          "npm --prefix frontend run build",
+    "build:standalone": "npm --prefix frontend run build:standalone",
+    "start":          "npm --prefix backend start",
+    "audit:all":      "npm --prefix backend audit --omit=dev && npm --prefix frontend audit"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  }
+}

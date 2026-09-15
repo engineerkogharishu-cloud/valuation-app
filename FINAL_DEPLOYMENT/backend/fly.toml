@@ -1,0 +1,43 @@
+# =============================================================================
+#  Fly.io deployment for the backend API.
+#
+#  The database is Turso (libSQL) over the network — there is NO local database
+#  file and therefore no volume. Set every secret from backend/.env.example with
+#  `fly secrets set KEY=value`; at minimum TURSO_DATABASE_URL, TURSO_AUTH_TOKEN,
+#  JWT_SECRET, SUPER_ADMIN_INITIAL_PASSWORD and CORS_ORIGIN. The server exits on
+#  boot if JWT_SECRET or TURSO_DATABASE_URL is missing.
+# =============================================================================
+
+app = "valuation-backend"
+primary_region = "sin"
+
+[build]
+
+# Non-secret values only. Secrets go through `fly secrets set`, never here.
+[env]
+  NODE_ENV = "production"
+  PORT = "3001"
+  # Used to build field-collection links. Railway injects RAILWAY_PUBLIC_DOMAIN
+  # automatically; on Fly you must set this yourself to the app hostname.
+  # PUBLIC_URL = "https://valuation-backend.fly.dev"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # Same probe Railway uses. /api/ping is the one route that answers a request
+  # with no Origin header, which is what a platform health check sends.
+  [[http_service.checks]]
+    method = "GET"
+    path = "/api/ping"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
